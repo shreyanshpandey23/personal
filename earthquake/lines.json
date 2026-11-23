@@ -1,0 +1,9 @@
+[
+ {"id":"l1","text":"Why does the ground suddenly shake?","voice":"am_michael","speed":0.95},
+ {"id":"l2","text":"Earth's outer shell is broken into giant plates, always on the move.","voice":"am_michael","speed":0.95},
+ {"id":"l3","text":"Where two plates meet, their edges lock together along a fault.","voice":"am_michael","speed":0.95},
+ {"id":"l4","text":"The plates keep pushing, and the rock bends, storing energy for years.","voice":"am_michael","speed":0.95},
+ {"id":"l5","text":"Until, suddenly, it snaps.","voice":"am_michael","speed":0.92},
+ {"id":"l6","text":"The energy races out as seismic waves, and the ground shakes.","voice":"am_michael","speed":0.95},
+ {"id":"l7","text":"That sudden slip is an earthquake.","voice":"am_michael","speed":0.92}
+]

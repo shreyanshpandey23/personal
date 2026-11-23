@@ -1,0 +1,13 @@
+What Causes an Earthquake? — credits for third-party assets
+
+Fonts
+- Jost (variable), Owen Earl (indestructible type*) — SIL Open Font License 1.1 — https://github.com/google/fonts/tree/main/ofl/jost
+
+Voice
+- Narration synthesised offline with Kokoro-82M (Apache-2.0) via kokoro-onnx, voice "am_michael". Checked with faster-whisper (MIT).
+
+Picture
+- Isometric drawing engine engine.js adapted from the Lemo-Opuscar library's iso-infographic demo (see the library's LICENSE). All scenes drawn in code.
+
+Sound
+- Music and sound effects synthesised in code (numpy/scipy); procedural foley helpers from the Lemo-Opuscar core/audio/sfx.py. No samples or recordings.
