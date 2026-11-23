@@ -1,0 +1,4 @@
+source/
+*.wav
+verify/
+log*.txt
