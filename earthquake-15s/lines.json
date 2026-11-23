@@ -1,0 +1,26 @@
+[
+ {
+  "id": "l1",
+  "text": "Earth's crust is broken into moving plates.",
+  "voice": "am_michael",
+  "speed": 1.0
+ },
+ {
+  "id": "l2",
+  "text": "Where they meet, the edges lock, and strain builds for years.",
+  "voice": "am_michael",
+  "speed": 1.02
+ },
+ {
+  "id": "l3",
+  "text": "Then the rock snaps.",
+  "voice": "am_michael",
+  "speed": 0.95
+ },
+ {
+  "id": "l4",
+  "text": "Seismic waves race out, and the ground shakes.",
+  "voice": "am_michael",
+  "speed": 1.02
+ }
+]

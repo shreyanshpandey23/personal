@@ -1,0 +1,15 @@
+1
+00:00:00,300 --> 00:00:03,500
+Earth's crust is broken into moving plates.
+
+2
+00:00:03,600 --> 00:00:08,252
+Where they meet, the edges lock, and strain builds for years.
+
+3
+00:00:08,500 --> 00:00:10,300
+Then the rock snaps.
+
+4
+00:00:10,400 --> 00:00:15,000
+Seismic waves race out, and the ground shakes.

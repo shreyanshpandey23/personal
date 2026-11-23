@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>What Causes an Earthquake?</title>
+<style>
+@font-face{font-family:'Jost';src:url('fonts/Jost.ttf') format('truetype');font-weight:100 900;}
+html,body{margin:0;background:#F1EBDD;overflow:hidden}canvas{display:block}
+</style></head><body>
+<canvas id="c"></canvas>
+<script type="module">
+import { Iso, tri, PAL, pin, ring, cutLine, hatch, haloText, iconGrid, ICON, clamp, lerp, seg, ss, eo, eio, back, hash, mix, hex, TAU } from './engine.js';
+
+const W = innerWidth, H = innerHeight, DUR = 15.0, STORY_DUR = 31.5;
+// the 15 s cut: film time -> story time (the long version's timeline), piecewise linear
+const MAP = [[0, 4.05], [3.0, 9.4], [4.8, 13.6], [8.6, 19.4], [10.0, 21.45], [12.6, 26.6], [15.0, 31.5]];
+const story = t => { for (let i = 0; i < MAP.length - 1; i++) { const [a, A] = MAP[i], [b, B] = MAP[i + 1]; if (t <= b) return A + (B - A) * clamp((t - a) / (b - a), 0, 1); } return MAP[MAP.length - 1][1]; };
+const film = T => { for (let i = 0; i < MAP.length - 1; i++) { const [a, A] = MAP[i], [b, B] = MAP[i + 1]; if (T <= B) return a + (b - a) * clamp((T - A) / (B - A), 0, 1); } return DUR; };
+const cv = document.getElementById('c'); cv.width = W; cv.height = H;
+const g = cv.getContext('2d');
+const iso = new Iso(g, W, H);
+PAL.ink = '#2A2430'; PAL.paper = '#FBF6EA';
+
+// ---------- legend: one hue, one meaning ----------
+const GROUND = '#F1EBDD', RED = '#E2503A', INK = PAL.ink;
+const T = {
+  plinth: tri('#E9DFCB'), grass: tri('#9DC488'), soil: tri('#A77850'),
+  rockA: tri('#D6AE74'), deepA: tri('#C39A62'), rockB: tri('#8EA1B7'), deepB: tri('#788CA4'),
+  wall: tri('#F4F1EA'), roof: tri('#9A8BC6'), trunk: tri('#8A6A4A'), crown: tri('#6E9F5A'),
+};
+const ei = x => x * x * x;
+
+// ---------- the board ----------
+const BX = 14, BY = 9, FY = 4.5, CUT = 9.5;          // fault plane at y = FY; the near-right block (x > CUT, y > FY) is cut away
+const FOCUS = [11.8, FY, -2.0];
+const STRATA = [[-3, -1.8, 'deep'], [-1.8, -.9, 'rock'], [-.9, -.35, 'soil'], [-.35, 0, 'grass']];
+const T_SNAP = 21.45;
+
+// ---------- timeline ----------
+const LINES = [ // subtitle cards follow the voice lines (film time)
+  { id: 'l1', t: 0.3, text: "Earth's crust is broken into moving plates." },
+  { id: 'l2', t: 3.6, text: 'Where they meet, the edges lock, and strain builds for years.' },
+  { id: 'l3', t: 8.5, text: 'Then the rock snaps.' },
+  { id: 'l4', t: 10.4, text: 'Seismic waves race out, and the ground shakes.' },
+];
+const VDUR = { l1: 2.692, l2: 3.552, l3: 1.325, l4: 2.841 };
+LINES.forEach((l, i) => { l.t1 = Math.max(l.t + VDUR[l.id] + .6, l.t + 1.8); if (LINES[i + 1]) l.t1 = Math.min(l.t1 + .5, LINES[i + 1].t - .1); else l.t1 = DUR; });
+window.CUES = LINES.map(l => ({ t0: l.t, t1: l.t1, text: l.text }));
+
+// loading: slip accumulates over "years", accelerating icon arrivals
+const L0 = 14.6, L1 = 19.2, SMAX = 1.4, NYEAR = 15;
+const loadK = t => { const u = seg(t, L0, L1); return 1 - (1 - u) * (1 - u); };
+const S = t => SMAX * loadK(t);
+const yearT = i => L0 + (L1 - L0) * (1 - Math.sqrt(1 - i / NYEAR));      // inverse of loadK: icon i lands when the load reaches i/N
+function release(t) { // fault slip at the snap: fast, with a little overshoot
+  if (t < T_SNAP) return 0; const u = t - T_SNAP;
+  return 1 - Math.exp(-u * 30) * Math.cos(u * 40) ;
+}
+const D = 1.6;   // locking depth scale: how far from the fault the bend reaches
+function u(y, t) { // surface displacement along x
+  const sg = y < FY ? 1 : -1, w = Math.exp(-Math.abs(y - FY) / D), s = S(t), r = release(t);
+  return sg * s / 2 * ((1 - w) + w * r);
+}
+const plateShift = (sg, t) => sg * S(t) / 2 * .85;
+
+// ---------- camera: centre + log zoom ----------
+const CAMS = [
+  [0.0, 7, 4.5, -3.1, 60], [3.6, 7, 4.5, -3.0, 66],
+  [4.2, 7, 4.5, -1.7, 55], [8.9, 7, 4.5, -1.6, 56],
+  [11.2, 10.4, 4.9, -1.3, 76], [13.6, 9.2, 4.8, -1.1, 70], [19.4, 9.3, 4.8, -1.1, 71],
+  [21.3, 11.4, 4.4, -1.7, 96], [24.2, 9.6, 4.6, -1.3, 68], [26.6, 9.2, 4.6, -1.3, 64],
+  [29.6, 7, 4.5, -1.75, 53], [31.5, 7, 4.5, -1.75, 52.5],
+];
+function camAt(t) {
+  let i = 0; while (i < CAMS.length - 2 && t > CAMS[i + 1][0]) i++;
+  const a = CAMS[i], b = CAMS[i + 1], k = eio(seg(t, a[0], b[0]));
+  const c = { x: lerp(a[1], b[1], k), y: lerp(a[2], b[2], k), z: lerp(a[3], b[3], k), k: Math.exp(lerp(Math.log(a[4]), Math.log(b[4]), k)) };
+  if (t > T_SNAP) { const e = Math.exp(-(t - T_SNAP) * 3.2) * .07; c.x += Math.sin(t * 71) * e; c.z += Math.sin(t * 53 + 1) * e; }
+  return c;
+}
+
+// ---------- props ----------
+const HOUSES = [[2.6, 1.3], [4.6, 2.6], [11.2, 1.4], [9.9, .9], [2.2, 6.6], [4.4, 7.7], [8.3, 7.2]];
+const TREES = [[1.2, 3.4], [6.0, 1.0], [9.2, 2.8], [13.2, .9], [1.0, 8.2], [6.2, 6.0], [3.2, 5.6], [9.0, 8.4]];
+const popT = (i) => 5.5 + i * .14;
+function arrival(x, y) { return T_SNAP + .1 + Math.hypot(x - FOCUS[0], (y - FY) * 1.2, FOCUS[2]) / 5; }
+function shake(x, y, t) { const a = arrival(x, y); if (t < a) return 0; const v = t - a; return Math.sin(v * 55) * Math.exp(-v * 2.2) * .09; }
+
+function house(x, y, t, i) {
+  const p = back(seg(t, popT(i), popT(i) + .35), 2.0); if (p <= 0) return;
+  const dx = u(y, t) + shake(x, y, t);
+  iso.push(x + dx, y, 0, 0, Math.max(.001, p));
+  iso.box(-.45, -.4, 0, .9, .8, .62, T.wall, { layer: 3 });
+  iso.roof(-.5, -.45, .62, 1.0, .9, .42, T.roof, { layer: 3, bias: .3 });
+  iso.pop();
+}
+function tree(x, y, t, i) {
+  const p = back(seg(t, popT(i) + .35, popT(i) + .65), 2.4); if (p <= 0) return;
+  const dx = u(y, t) + shake(x, y, t) * 1.4;
+  iso.push(x + dx, y, 0, 0, Math.max(.001, p));
+  iso.cyl(0, 0, 0, .07, .38, T.trunk, { layer: 3, n: 8 });
+  iso.sphere(0, 0, .68, .34, T.crown, { layer: 3, bias: .2 });
+  iso.pop();
+}
+
+// drop-in for the plates: fall, squash, settle
+function drop(t, t0) { const p = seg(t, t0, t0 + .5); if (p < 1) return 14 * (1 - ei(p)) ; const v = t - t0 - .5; return -Math.exp(-v * 9) * Math.sin(v * 22) * .18; }
+
+function plate(which, t) {
+  const A = which === 'A';
+  const z0 = A ? drop(t, 4.15) : drop(t, 4.75);
+  if (z0 > 13.9) return;
+  const sx = plateShift(A ? 1 : -1, t);
+  const tones = { deep: A ? T.deepA : T.deepB, rock: A ? T.rockA : T.rockB, soil: T.soil, grass: T.grass };
+  for (const [za, zb, k] of STRATA) {
+    if (A) iso.box(sx, 0, za + z0, BX, FY, zb - za, tones[k], { layer: 1, cull: false });
+    else {
+      iso.box(sx, FY, za + z0, CUT, BY - FY, zb - za, tones[k], { layer: 2, cull: false,
+        decal: cutT(t) > 0 ? (I, d) => sectionRim(I, d, sx) : null });
+      // the near-right block: slides out along +y when the cutaway opens
+      const o = eo(seg(t, 10.0, 10.55));
+      if (o < 1) { iso.alpha = 1 - ss(seg(t, 10.25, 10.6)); iso.box(CUT + sx, FY + o * 6, za + z0, BX - CUT, BY - FY, zb - za, tones[k], { layer: 2.2, cull: false }); iso.alpha = 1; }
+    }
+  }
+}
+const cutT = t => seg(t, 10.3, 10.8);
+function sectionRim(I, d, sx) { // hatched cut face on the block's +x side, fading in at the end of the cut
+  const x = d.x + d.w, P = (y, z) => I.P(x, y, z);
+  const pts = [P(d.y, d.z), P(d.y + d.d, d.z), P(d.y + d.d, d.z + d.h), P(d.y, d.z + d.h)];
+  I.g.save(); I.g.globalAlpha = cutT(CURT); hatch(I.g, pts, { fill: '#F6EEDD', sp: 7, color: 'rgba(42,36,48,.45)', edge: 1.2 }); I.g.restore();
+}
+let CURT = 0;
+
+// ---------- the fault face: stress, crack, waves (energy red only) ----------
+function faultFace(t) {
+  if (t < 10.4) return;
+  const sA = plateShift(1, t), sB = plateShift(-1, t);
+  const x0 = CUT + sB, x1 = BX + sA;
+  iso.add(0, () => {
+    const P = (x, z) => iso.P(x, FY, z);
+    const face = [P(x0, -3), P(x1, -3), P(x1, 0), P(x0, 0)];
+    const stress = loadK(t) * (t < T_SNAP ? 1 : Math.exp(-(t - T_SNAP) * 1.4));
+    g.save(); g.beginPath(); face.forEach((p, i) => i ? g.lineTo(...p) : g.moveTo(...p)); g.closePath(); g.clip();
+    // stress glow: concentric bands around the focus, growing with the load
+    const [fx, fy] = P(FOCUS[0] + sA * 0, FOCUS[2]);
+    if (stress > .01) for (let r = 4; r >= 1; r--) {
+      g.beginPath(); const R = r * .55 * iso.cam.k * (.5 + stress * .7);
+      g.ellipse(fx, fy, R * .87, R * .7, 0, 0, TAU); g.fillStyle = `rgba(226,80,58,${.14 * stress})`; g.fill();
+    }
+    // the crack: a jagged line along the slip patch at the snap
+    if (t > T_SNAP) {
+      const a = 1 - seg(t, T_SNAP + 1.2, T_SNAP + 2.4);
+      g.strokeStyle = `rgba(226,80,58,${a})`; g.lineWidth = 3; g.beginPath();
+      for (let i = 0; i <= 14; i++) { const x = FOCUS[0] - 1.9 + i * .27, z = FOCUS[2] + (hash(i) - .5) * .35; const p = P(x, z); i ? g.lineTo(...p) : g.moveTo(...p); }
+      g.stroke();
+      // waves on the fault face: rings from the focus
+      for (let k = 0; k < 5; k++) {
+        const r = (t - T_SNAP - k * .45) * 4.2; if (r <= 0 || r > 9) continue;
+        const al = (1 - r / 9) * (t < 27 ? 1 : 1 - seg(t, 27, 28.5));
+        g.beginPath(); for (let j = 0; j <= 64; j++) { const an = j / 64 * TAU; const p = P(FOCUS[0] + Math.cos(an) * r, FOCUS[2] + Math.sin(an) * r * .8); j ? g.lineTo(...p) : g.moveTo(...p); }
+        g.strokeStyle = `rgba(226,80,58,${al})`; g.lineWidth = 3; g.setLineDash([12, 8]); g.stroke(); g.setLineDash([]);
+      }
+    }
+    g.restore();
+    // focus: a red star dot
+    if (t > T_SNAP - .2) { const k = back(seg(t, T_SNAP, T_SNAP + .3), 2.5); g.beginPath(); g.arc(fx, fy, 11 * k, 0, TAU); g.fillStyle = RED; g.fill(); g.lineWidth = 2.5; g.strokeStyle = PAL.paper; g.stroke(); }
+  }, 2.5);
+}
+
+// surface: road, fault trace, ground waves
+function surface(t) {
+  // road crossing the fault: drawn ahead of nothing (it leads the eye across the plates)
+  const p = seg(t, 6.2, 7.0);
+  if (p > 0) {
+    const pts = []; const n = 60;
+    for (let i = 0; i <= n * p; i++) { const y = i / n * BY; pts.push([7 + u(y, t), y, .02]); }
+    iso.keep = true;
+    iso.line3(pts, '#5D6570', .5, { world: true, layer: 2.8, depth: 0, cap: 'butt' });
+    iso.line3(pts, '#F4F1EA', 2, { layer: 2.81, depth: 0, dash: [10, 10], cap: 'butt' });
+    iso.keep = false;
+  }
+  // fault trace: red dashed line along the surface
+  const f = seg(t, 10.9, 11.7);
+  if (f > 0) {
+    const sA = plateShift(1, t);
+    iso.keep = true;
+    iso.line3([[sA, FY, .03], [sA + (CUT) * f, FY, .03]], RED, 3, { layer: 2.9, depth: 0, dash: [12, 8] });
+    iso.line3([[CUT, FY, .03], [CUT + (BX - CUT) * f, FY, .03]], RED, 3, { layer: 2.9, depth: 0, dash: [12, 8] });
+    iso.keep = false;
+  }
+  // ground waves: iso circles round the epicentre, only where there is ground
+  if (t > T_SNAP + .3 && t < 28.5) {
+    iso.add(0, () => {
+      for (let k = 0; k < 4; k++) {
+        const r = (t - T_SNAP - .3 - k * .5) * 3.4; if (r <= .2 || r > 10) continue;
+        const al = (1 - r / 10) * (1 - seg(t, 27, 28.5));
+        g.save(); g.strokeStyle = `rgba(226,80,58,${al})`; g.lineWidth = 3; g.setLineDash([12, 8]); g.beginPath();
+        let on = false;
+        for (let j = 0; j <= 96; j++) {
+          const an = j / 96 * TAU, x = FOCUS[0] + Math.cos(an) * r, y = FY + Math.sin(an) * r;
+          const ok = x > 0 && x < BX && y > 0 && y < BY && !(x > CUT && y > FY);
+          if (!ok) { on = false; continue; }
+          const s = iso.P(x, y, .03); on ? g.lineTo(...s) : g.moveTo(...s); on = true;
+        }
+        g.stroke(); g.restore();
+      }
+    }, 2.95);
+  }
+}
+
+// plate motion arrows (ink, on the surface)
+function arrows(t) {
+  const a = eo(seg(t, 7.0, 7.7)) * (1 - seg(t, 13.2, 13.7));
+  if (a <= 0) return;
+  const arr = (y, dir) => {
+    const x0 = dir > 0 ? 1.2 : 5.2, len = 3.2 * a, x1 = x0 + dir * len;
+    iso.line3([[x0, y, .05], [x1, y, .05]], INK, 3.5, { layer: 3.5, depth: 0 });
+    const h = .45; iso.line3([[x1 - dir * h, y - h * .6, .05], [x1, y, .05], [x1 - dir * h, y + h * .6, .05]], INK, 3.5, { layer: 3.5, depth: 0 });
+  };
+  arr(3.4, 1); arr(5.9, -1);
+}
+
+// ---------- title on the empty board ----------
+function title(t) {
+  return;
+  const lift = ei(seg(t, 3.7, 4.5)) * 16, a = eo(seg(t, .25, .9));
+  const ex = .35 * a;
+  iso.text3('WHAT CAUSES', 4.3, 8.4, -3 + lift, { plane: 'xy', size: 1.05, extrude: ex, tri: tri('#3E3646'), font: 'Jost', weight: 600, track: 12, layer: 4, depth: 0 });
+  iso.keep = true;
+  iso.text3('AN EARTHQUAKE?', 6.0, 8.85, -3 + lift, { plane: 'xy', size: 1.05, extrude: ex, tri: tri(RED), font: 'Jost', weight: 600, track: 12, layer: 4, depth: 1 });
+  iso.keep = false;
+}
+
+// ---------- overlay: pins, Isotype years, subtitles ----------
+let TEXT_LIST = [];
+function pinT(id, x, y, z, o, t0, t1, t) {
+  if (t < t0 || t > t1 + .4) return;
+  const a = seg(t, t0, t0 + .9), fade = 1 - seg(t, t1, t1 + .4);
+  pin(iso, x, y, z, { ...o, a, fade });
+  if (a > .45 && fade > .5) {
+    const [ax, ay] = iso.P(x, y, z), up = o.up ?? 130, dir = o.dir ?? 1, len = o.len ?? 60, tx = ax + dir * (len + 12), ty = ay - up;
+    g.font = `600 ${o.ts || 25}px Jost`; const w = g.measureText(o.title).width + o.title.length * 3.5;
+    TEXT_LIST.push({ id, text: o.title + (o.num ? ' ' + o.num + ' ' + (o.unit || '') : ''), x0: dir > 0 ? tx : tx - w, y0: ty - 36, x1: dir > 0 ? tx + w : tx, y1: ty + (o.num ? 50 : 0), pass: o.pass });
+  }
+}
+function overlays(t, tf) {
+  const sA = plateShift(1, t), sB = plateShift(-1, t);
+  // build: the two plates
+  pinT('pa', 11 + sA, 1.0, 0, { title: 'PLATE A', dir: 1, up: 80, len: 50 }, 7.4, 13.0, t);
+  pinT('pb', 6.0 + sB, 8.2, 0, { title: 'PLATE B', dir: -1, up: 60, len: 50 }, 7.5, 13.0, t);
+  // the fault
+  pinT('fault', 2.5 + sA, FY, 0, { title: 'FAULT', num: 'LOCKED', dir: -1, up: 110, len: 60, ns: 30 }, 11.6, 19.0, t);
+  // Isotype: years of strain, one icon per decade, arriving faster and faster
+  if (t > L0 - .4 && t < 21.0) {
+    const fade = 1 - seg(t, 20.4, 21.0), a = seg(t, L0 - .4, L0 + .4);
+    let m = 0; for (let i = 0; i < NYEAR; i++) m += clamp((t - yearT(i)) / .18, 0, 1);
+    const x = 70, y = 150;
+    g.save(); g.globalAlpha = fade * a;
+    haloText(g, 'STRAIN BUILDS', x, y, { font: '600 25px Jost', track: 3.5 });
+    const yrs = Math.round(loadK(t) * 150);
+    haloText(g, String(yrs), x, y + 56, { font: '400 52px Jost' });
+    g.font = '400 52px Jost'; const nw = g.measureText(String(150)).width;
+    haloText(g, 'YEARS', x + nw + 14, y + 56, { font: '500 24px Jost', track: 2 });
+    iconGrid(g, x, y + 76, NYEAR, m, 5, 40, (gg, px, py, s, lit) => ICON.box(gg, px, py, s * .8, tri(RED), lit));
+    haloText(g, '1 ICON = 10 YEARS', x, y + 76 + 3 * 40 + 30, { font: '500 16px Jost', track: 2, color: '#6A6370' });
+    g.restore();
+    if (a > .5 && fade > .5) TEXT_LIST.push({ id: 'years', text: 'STRAIN BUILDS YEARS', x0: x, y0: y - 25, x1: x + 260, y1: y + 60 });
+  }
+  // the snap and its result
+  const [fx, fy] = iso.P(FOCUS[0], FY, FOCUS[2]);
+  if (t > T_SNAP + .1 && t < 27.0) ring(g, fx, fy, 42, seg(t, T_SNAP + .1, T_SNAP + .5) * (1 - seg(t, 26.5, 27)), t, null, { color: RED, lw: 3 });
+  pinT('focus', FOCUS[0], FY, FOCUS[2], { title: 'FOCUS', dir: 1, up: -150, len: 50, dot: RED }, 22.0, STORY_DUR, t);
+  pinT('epi', FOCUS[0] + .6 + plateShift(1, t), FY, 0, { title: 'EPICENTRE', dir: 1, up: 110, len: 50, dot: RED }, 23.0, STORY_DUR, t);
+  pinT('waves', 8.6, 2.3, 0, { title: 'SEISMIC WAVES', dir: 1, up: 150, len: 50, dot: RED }, 24.0, STORY_DUR, t);
+  // the reveal: the finished infographic
+  pinT('pa2', 11 + sA, 1.0, 0, { title: 'PLATE A', dir: 1, up: 80, len: 50 }, 26.7, STORY_DUR, t);
+  pinT('pb2', 1.4 + sB, 8.4, 0, { title: 'PLATE B', dir: -1, up: 70, len: 50 }, 26.8, STORY_DUR, t);
+  pinT('fault2', 2.5 + sA, FY, 0, { title: 'FAULT', dir: -1, up: 110, len: 60 }, 26.6, STORY_DUR, t);
+  if (t > 28.5) { g.save(); g.globalAlpha = seg(t, 28.5, 29.2); haloText(g, 'NOT TO SCALE', W - 70, 150, { font: '600 18px Jost', track: 3.5, align: 'right', color: '#6A6370' }); g.restore(); }
+  // plate direction: a tiny reading on the arrows
+  if (t > 7.6 && t < 13.5) { const k = seg(t, 7.6, 8.1) * (1 - seg(t, 13.0, 13.5)); const [ax, ay] = iso.P(3.0, 3.4, .05); g.save(); g.globalAlpha = k; haloText(g, 'A FEW CM A YEAR', ax + 30, ay - 22, { font: '600 18px Jost', track: 2.5 }); g.restore(); }
+  subtitle(tf);
+}
+function subtitle(t) {
+  const l = LINES.find(l => t >= l.t && t < l.t1); if (!l) return;
+  const a = seg(t, l.t, l.t + .25), out = 1 - seg(t, l.t1 - .15, l.t1);
+  g.save(); g.font = '500 40px Jost';
+  const tw = g.measureText(l.text).width, cw = tw + 110, ch = 76, cx = W / 2 - cw / 2, cy = H - 60 - ch;
+  g.globalAlpha = out;
+  g.beginPath(); g.roundRect(cx, cy, cw, ch, 10); g.fillStyle = 'rgba(251,246,234,.96)'; g.fill();
+  // border draws first
+  const per = 2 * (cw + ch), dl = per * eo(a);
+  g.setLineDash([dl, per]); g.lineWidth = 2.5; g.strokeStyle = INK; g.stroke(); g.setLineDash([]);
+  ICON.box(g, cx + 38, cy + ch / 2 + 2, 26, tri(RED), 1);
+  // text wipes in
+  const w = seg(t, l.t + .12, l.t + .45);
+  g.beginPath(); g.rect(cx + 64, cy, (tw + 20) * ss(w), ch); g.clip();
+  g.fillStyle = INK; g.textBaseline = 'middle'; g.fillText(l.text, cx + 70, cy + ch / 2 + 2);
+  g.restore();
+}
+
+// ---------- background ----------
+function ground() {
+  g.fillStyle = GROUND; g.fillRect(0, 0, W, H);
+  // faint isometric dot lattice
+  g.fillStyle = 'rgba(42,36,48,.08)';
+  const k = iso.cam.k * 1.0;
+  const [ox, oy] = iso.P(0, 0, -3.6);
+  const sx = 2 * .866 * k, sy = k;
+  for (let y = ((oy % sy) + sy) % sy - sy; y < H + sy; y += sy) for (let x = ((ox % sx) + sx) % sx - sx, r = 0; x < W + sx; x += sx) {
+    const row = Math.round((y - oy) / sy); const xx = x + (row % 2 ? sx / 2 : 0);
+    g.beginPath(); g.arc(xx, y, 1.4, 0, TAU); g.fill();
+  }
+}
+function plinth(t) {
+  iso.box(-.3, -.3, -3.6, BX + .6, BY + .6, .6, T.plinth, { layer: 0, cull: false });
+  // soft shadow under the board
+  iso.add(-1e9, () => {
+    const [sx, sy] = iso.P(BX / 2, BY / 2, -3.6), k = iso.cam.k;
+    g.save(); g.translate(sx, sy + k * 1.3); g.scale(1, .5);
+    const gr = g.createRadialGradient(0, 0, k, 0, 0, k * 13); gr.addColorStop(0, 'rgba(42,36,48,.16)'); gr.addColorStop(1, 'rgba(42,36,48,0)');
+    g.fillStyle = gr; g.beginPath(); g.arc(0, 0, k * 13, 0, TAU); g.fill(); g.restore();
+  }, -1);
+}
+
+// ---------- frame ----------
+function render(tf) {
+  const t = story(tf);
+  CURT = t; TEXT_LIST = [];
+  iso.cam = camAt(t);
+  // focus + context: while strain builds, only the road, the fault and the energy keep colour
+  iso.desat = .65 * ss(seg(t, 14.0, 15.0)) * (1 - ss(seg(t, T_SNAP + .4, T_SNAP + 1.4)));
+  ground();
+  plinth(t);
+  title(t);
+  plate('A', t); plate('B', t);
+  faultFace(t);
+  HOUSES.forEach(([x, y], i) => { if (!(x > CUT && y > FY)) house(x, y, t, i); });
+  TREES.forEach(([x, y], i) => tree(x, y, t, i));
+  surface(t); arrows(t);
+  // cut line: drawn before the near-right block slides away
+  iso.add(0, () => {
+    const a = seg(t, 9.6, 10.0) * (1 - seg(t, 10.6, 10.9)); if (a <= 0) return;
+    const P = (x, y, z) => iso.P(x, y, z);
+    cutLine(g, [P(CUT, BY, 0), P(CUT, FY, 0), P(BX, FY, 0), P(BX, FY, -3)], a, { color: INK });
+  }, 5);
+  iso.flush();
+  overlays(t, tf);
+  if (false) { const a = eo(seg(t, .3, .9)) * (1 - seg(t, 3.5, 3.9)); TEXT_LIST.push({ id: 'title', text: 'WHAT CAUSES AN EARTHQUAKE?', x0: 400, y0: 300, x1: 1500, y1: 800, pass: a < .99 && t > 3 }); }
+}
+
+// ---------- sound events ----------
+const EV = [];
+EV.push({ t: 4.06, type: 'motif' });
+EV.push({ t: 4.65, type: 'land', pan: -.2 }, { t: 5.25, type: 'land', pan: .2 });
+HOUSES.forEach(([x, y], i) => { if (!(x > CUT && y > FY)) EV.push({ t: popT(i) + .2, type: 'pop', pan: (x - y) / 14 }); });
+EV.push({ t: 6.2, type: 'road' }, { t: 7.0, type: 'arrow', pan: -.3 }, { t: 7.3, type: 'arrow', pan: .3 });
+EV.push({ t: 9.6, type: 'cut', pan: .3 }, { t: 10.0, type: 'slide', pan: .4 }, { t: 10.9, type: 'trace', pan: 0 });
+for (let i = 0; i < NYEAR; i++) EV.push({ t: yearT(i), type: 'year', i, pan: -.6 });
+EV.push({ t: L0, type: 'strain_start' }, { t: 19.4, type: 'silence' }, { t: T_SNAP, type: 'snap', pan: .35 });
+HOUSES.forEach(([x, y], i) => { if (!(x > CUT && y > FY)) EV.push({ t: arrival(x, y), type: 'rattle', pan: (x - y) / 14 }); });
+[22.0, 23.0, 24.0, 27.3, 27.6, 27.9].forEach(t => EV.push({ t, type: 'tick' }));
+EV.push({ t: 27.4, type: 'resolve' });
+EV.forEach(e => { e.t = film(e.t); });
+LINES.forEach(l => EV.push({ t: l.t, type: 'voice', id: l.id }));
+
+window.DUR = DUR; window.EV = EV;
+window.render = render;
+window.TEXTS = t => { render(t); return TEXT_LIST.slice(); };
+document.fonts.load('600 30px Jost').then(() => { render(0); window.READY = true; });
+</script></body></html>
