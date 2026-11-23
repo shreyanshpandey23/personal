@@ -1,0 +1,39 @@
+{
+  "business": "Bowlista, a 100% pure-veg bowls, burritos, subs and cold brew outlet",
+  "target": "BBD University students in Lucknow, 18 to 24, who eat out or order in several times a week",
+  "where": "Crown Mall, Faizabad Road, near BBD campus, Lucknow",
+  "age": [18, 24],
+  "segments": [
+    {"name": "Hostel or PG student from out of town (income = annual spending money in rupees)", "share": 0.45, "income": [72000, 180000]},
+    {"name": "Day scholar living with family in Lucknow (income = annual pocket money in rupees)", "share": 0.35, "income": [24000, 96000]},
+    {"name": "Well-off student who eats out often (income = annual spending money in rupees)", "share": 0.20, "income": [180000, 480000]}
+  ],
+  "behaviours": [
+    {"name": "Mess-food escaper", "share": 0.20, "how": "Skips the hostel mess or PG food several times a week and looks for something cheap and filling."},
+    {"name": "Coupon hunter", "share": 0.18, "how": "Orders on Swiggy or Zomato only when there is a discount, compares final price after delivery fees."},
+    {"name": "Group hangout", "share": 0.15, "how": "Goes to the mall with friends after class; the group picks the place together."},
+    {"name": "Loyal to the canteen or dhaba", "share": 0.15, "how": "Has a regular spot near campus for chai, maggi, chole bhature or thali, and rarely tries new places."},
+    {"name": "Late-night orderer", "share": 0.10, "how": "Orders food to the hostel late at night while studying or gaming."},
+    {"name": "Fitness-minded", "share": 0.10, "how": "Goes to the gym, counts protein, prefers food that feels lighter or healthier."},
+    {"name": "Trend chaser", "share": 0.07, "how": "Tries new cafes early and posts them on Instagram stories."},
+    {"name": "Checks ratings first", "share": 0.05, "how": "Will not try a place under 4 stars on Zomato or without friends recommending it."}
+  ],
+  "objections": [
+    "A ₹69 mini will not fill me up, so I will end up spending more",
+    "The canteen or dhaba near campus is cheaper and closer",
+    "Bowls and burritos are not my kind of food; I want something desi and spicy",
+    "Veg-only means no chicken, and my friends want non-veg",
+    "Delivery fees and packaging charges make it expensive on the apps",
+    "New places start good and the portions shrink after a month",
+    "Going to Crown Mall between classes is a hassle",
+    "Cold brew sounds overpriced for a student"
+  ],
+  "habits": [
+    "you have about an hour between classes at lunch",
+    "your monthly money runs low in the last week of the month",
+    "you hang out at Crown Mall with friends on weekends",
+    "you order food to your room at least twice a week",
+    "you split bills with friends using UPI",
+    "you go home for festivals and weekends sometimes"
+  ]
+}
