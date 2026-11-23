@@ -1,0 +1,17 @@
+Bowlista — Store in a Box: credits for third-party assets
+
+Brand
+- BOWLISTA name, logo, colours, menu and "100% Pure Veg" claim: the client's own brand materials (redrawn in code from their brand board).
+
+Fonts
+- Newsreader (variable), Production Type — SIL Open Font License 1.1 — https://github.com/google/fonts/tree/main/ofl/newsreader
+- Jost (variable), Owen Earl (indestructible type*) — SIL Open Font License 1.1 — https://github.com/google/fonts/tree/main/ofl/jost
+
+Voice
+- Narration synthesised offline with Kokoro-82M (Apache-2.0) via kokoro-onnx, voice "af_heart"; checked with faster-whisper (MIT).
+
+Picture
+- engine.js, kit.js and tools/motion_check.mjs from the Lemo-Opuscar library's isometric-picture-book demo (MIT); kit.js adapted for a vertical frame. All scenes drawn in code.
+
+Sound
+- Music and sound effects synthesised in code (numpy/scipy); procedural foley helpers from Lemo-Opuscar core/audio/sfx.py (MIT). No samples or recordings.

@@ -1,0 +1,47 @@
+[
+ {
+  "id": "l1",
+  "text": "This is Bowlista: a whole food counter that fits in a box.",
+  "voice": "af_heart",
+  "speed": 1.0,
+  "asr": "This is Bolista, a whole food counter that fits in a box."
+ },
+ {
+  "id": "l2",
+  "text": "Walk up, and order at the screen.",
+  "voice": "af_heart",
+  "speed": 1.0
+ },
+ {
+  "id": "l3",
+  "text": "Pick your base: a bowl, a wrap, or a sub.",
+  "voice": "af_heart",
+  "speed": 1.0
+ },
+ {
+  "id": "l4",
+  "text": "Then add fresh fillings from the topping bar.",
+  "voice": "af_heart",
+  "speed": 1.0
+ },
+ {
+  "id": "l5",
+  "text": "Add a cold brew. It's all one hundred percent veg.",
+  "voice": "af_heart",
+  "speed": 1.0,
+  "asr": "Add a cold brew. It's all 100% veg."
+ },
+ {
+  "id": "l6",
+  "text": "Then it's packed and placed on the shelf, for pickup or delivery.",
+  "voice": "af_heart",
+  "speed": 1.0
+ },
+ {
+  "id": "l7",
+  "text": "Bowlista. Fresh, and plant-powered.",
+  "voice": "af_heart",
+  "speed": 0.95,
+  "asr": "Bolista, fresh and plant-powered."
+ }
+]

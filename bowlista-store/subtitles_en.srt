@@ -1,0 +1,27 @@
+1
+00:00:01,500 --> 00:00:05,450
+This is Bowlista: a whole food counter that fits in a box.
+
+2
+00:00:05,500 --> 00:00:07,950
+Walk up, and order at the screen.
+
+3
+00:00:08,000 --> 00:00:10,650
+Pick your base: a bowl, a wrap, or a sub.
+
+4
+00:00:10,700 --> 00:00:13,350
+Then add fresh fillings from the topping bar.
+
+5
+00:00:13,400 --> 00:00:16,750
+Add a cold brew. It's all one hundred percent veg.
+
+6
+00:00:16,800 --> 00:00:21,550
+Then it's packed and placed on the shelf, for pickup or delivery.
+
+7
+00:00:21,600 --> 00:00:25,500
+Bowlista. Fresh, and plant-powered.
