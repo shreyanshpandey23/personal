@@ -1,0 +1,6 @@
+[
+ {"id":"l1","text":"Bowlista: a whole food counter in a box.","voice":"af_heart","speed":1.08,"asr":"Bolista, a whole food counter in a box."},
+ {"id":"l2","text":"Pick a base, then add fresh fillings.","voice":"af_heart","speed":1.05},
+ {"id":"l3","text":"Packed for pickup or delivery.","voice":"af_heart","speed":1.05},
+ {"id":"l4","text":"And it's all one hundred percent veg.","voice":"af_heart","speed":1.08,"asr":"And it's all 100% veg."}
+]

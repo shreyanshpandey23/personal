@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Bowlista — Store in a Box</title>
+<style>
+@font-face{font-family:'Newsreader';src:url('fonts/Newsreader.ttf') format('truetype');font-weight:200 800;}
+@font-face{font-family:'Jost';src:url('fonts/Jost.ttf') format('truetype');font-weight:100 900;}
+html,body{margin:0;background:#F2EBDD;overflow:hidden}canvas{display:block}
+</style></head><body>
+<canvas id="c"></canvas>
+<script type="module">
+import { C, W, H, iso, tri, mix, hex, css, TAU, clamp, lerp, seg, ss, eo, eio, hash, onPlane, fillPoly, quad, rect, facet,
+  phraseLayout, floorType, phraseBox, drawPerson, LEGS, ei } from './kit.js';
+
+const cv = document.getElementById('c'); cv.width = W; cv.height = H;
+const g = cv.getContext('2d'); iso.g = g;
+const NOSUB = /nosub=1/.test(location.search);
+
+// ---------- brand palette mapped onto the style's roles ----------
+Object.assign(C, { bg: '#F2EBDD', paper: '#FAF5EA', ink: '#0B1026', soft: '#6F6A60', ghost: '#DCD3C3', accent: '#FF6A2B', accentLt: '#FFCBB1' });
+const COBALT = '#1F3BFF', LIME = '#D9F93A', TANG = '#FF6A2B', NAVY = '#0B1026', SUN = '#FFC83D', KRAFT = '#C9A06A', WHITE = '#F6F3EC', STEEL = '#CFC9BF';
+const TOPS = { a: '#B9824F', b: '#8FA58A', c: '#8C8199', staff: COBALT };
+
+// ---------- timeline (narration lines set the beats) ----------
+const DUR = 10.0;
+// the 10 s cut: four moments of the same story, joined by cuts on the beat at the same angle. [film start, film end, story start]
+const SEGS = [[0, 2.6, .2], [2.6, 5.4, 10.5], [5.4, 7.9, 17.9], [7.9, 10.0, 22.6]];
+const story = tf => { for (const [f0, f1, s0] of SEGS) if (tf < f1) return s0 + Math.max(0, tf - f0); const [f0, , s0] = SEGS[SEGS.length - 1]; return s0 + tf - f0; };
+const toFilm = ts => { for (const [f0, f1, s0] of SEGS) if (ts >= s0 && ts < s0 + (f1 - f0)) return f0 + ts - s0; return null; };
+window.SHOTS = SEGS.map(([f0]) => [f0]);
+const LINES = [
+  { id: 'l1', t: 0.15, d: 2.438, text: 'Bowlista: a whole food counter in a box.' },
+  { id: 'l2', t: 2.75, d: 1.933, text: 'Pick a base, then add fresh fillings.' },
+  { id: 'l3', t: 5.6, d: 1.569, text: 'Packed for pickup or delivery.' },
+  { id: 'l4', t: 8.0, d: 1.826, text: "And it's all 100% veg." },
+];
+LINES.forEach((l, i) => { l.t1 = LINES[i + 1] ? LINES[i + 1].t - .05 : DUR; });
+window.CUES = LINES.map(l => ({ t0: l.t, t1: l.t1, text: l.text }));
+
+// ---------- the place (metres; x down-right, y down-left, z up) ----------
+const BACK = -2.4, FRONT = .9, Y0 = 0, Y1 = 11, BOXH = 3.8;
+const LANEX = 1.7;                                   // where customers stand and walk
+const ST = { pos: 10.4, base: 8.2, fresh: 6.2, brew: 4.0, pick: 1.5 };
+
+// steady walking pace with short gentle starts and stops (peak speed 1.25× the average)
+const trap = (u, a = .2) => { const v = 1 / (1 - a); if (u < a) return v * u * u / (2 * a); if (u > 1 - a) return 1 - v * (1 - u) * (1 - u) / (2 * a); return v * (u - a / 2); };
+// a walk: keys [[t, y], …] at a fixed x, eased per leg; returns position, walking flag, stride phase
+function walker(keys) {
+  return t => {
+    if (t <= keys[0][0]) return { y: keys[0][1], walking: false, phase: 0, on: t >= keys[0][0] - 1e-6 };
+    let dist = 0;
+    for (let i = 0; i < keys.length - 1; i++) {
+      const [t0, y0] = keys[i], [t1, y1] = keys[i + 1];
+      if (t < t1) {
+        const k = trap(seg(t, t0, t1)), y = lerp(y0, y1, k);
+        dist += Math.abs(y - y0);
+        return { y, walking: y0 !== y1 && k > 0 && k < 1, phase: dist / 1.35 * TAU, on: true };
+      }
+      dist += Math.abs(y1 - y0);
+    }
+    return { y: keys[keys.length - 1][1], walking: false, phase: dist / 1.35 * TAU, on: true };
+  };
+}
+const A = walker([[3.6, 15.6], [6.9, ST.pos], [8.0, ST.pos], [9.6, ST.base], [10.7, ST.base], [12.1, ST.fresh], [13.4, ST.fresh], [15.0, ST.brew], [16.8, ST.brew], [18.4, ST.pick], [20.3, ST.pick], [23.2, -2.8]]);
+const Bq = walker([[9.0, 16.2], [12.2, ST.pos]]);
+const Cq = walker([[12.4, 16.6], [15.4, ST.pos + .78]]);
+const S1 = walker([[0, ST.base], [10.7, ST.base], [12.1, ST.fresh], [13.4, ST.fresh], [15.0, ST.brew + .45]]);
+const S2 = walker([[0, ST.brew - .85], [16.8, ST.brew - .85], [18.4, ST.pick - .3]]);
+const S3 = walker([[0, ST.pos]]);
+
+// the order: bowl on the counter, carried along by staff; cup poured at the brew station; bagged at the pickup end
+function bowlY(t) { if (t < 10.7) return ST.base; if (t < 15.0) return S1(t).y; if (t < 16.8) return ST.brew; return lerp(ST.brew, ST.pick, eio(seg(t, 16.8, 18.4))); }
+const BAG_T = 18.45, SHELF_T = 18.95, TAKE_T = 20.0;
+
+// ---------- camera: translation + zoom only ----------
+const CAMS = [
+  [0.0, -0.6, 5.4, 1.5, 60], [1.4, -0.5, 5.5, 1.4, 62], [3.9, 1.8, 7.0, 1.3, 80], [5.3, 1.8, 7.0, 1.3, 80],
+  [6.6, 2.0, ST.pos - 1.25, 1.15, 150], [8.0, 2.0, ST.pos - 1.25, 1.15, 150], [9.7, 2.0, ST.base - 1.25, 1.15, 150], [10.7, 2.0, ST.base - 1.25, 1.15, 150], [12.2, 2.0, ST.fresh - 1.25, 1.15, 150], [13.4, 2.0, ST.fresh - 1.25, 1.15, 150],
+  [15.1, 2.0, ST.brew - 1.25, 1.15, 150], [16.8, 2.0, ST.brew - 1.25, 1.15, 150], [18.5, 2.0, ST.pick - 1.25, 1.15, 150], [20.3, 2.0, .2, 1.1, 140], [21.0, 2.0, -.2, 1.1, 132],
+  [22.6, .9, 5.2, 1.6, 57], [25.5, .9, 5.2, 1.6, 56],
+];
+function camAt(t) {
+  let i = 0; while (i < CAMS.length - 2 && t > CAMS[i + 1][0]) i++;
+  const a = CAMS[i], b = CAMS[i + 1], k = eio(seg(t, a[0], b[0]));
+  return { x: lerp(a[1], b[1], k), y: lerp(a[2], b[2], k), z: lerp(a[3], b[3], k), k: Math.exp(lerp(Math.log(a[4]), Math.log(b[4]), k)) * (H / 1920) };
+}
+
+// ---------- floor type: one key word per beat, lying on clear floor in front of the line ----------
+const word = (s, accentIdx = [0]) => [...s].map((ch, i) => [ch, ch === ' ' ? 'n' : accentIdx.includes(i) ? 'na' : 'n']);
+const PHR = [   // film time
+  { id: 'box', x: 4.4, y: 9.4, t0: .8, t1: 2.6, scale: .78, lines: [word('BOX', [0, 1, 2])] },
+  { id: 'fresh', x: 3.9, y: ST.fresh + .9, t0: 2.75, t1: 5.4, scale: .56, lines: [word('FRESH')] },
+  { id: 'pick', x: 3.9, y: ST.pick + .9, t0: 5.5, t1: 7.9, scale: .56, lines: [word('PICKUP')] },
+  { id: 'veg', x: 4.9, y: 10.6, t0: 7.95, t1: 99, scale: .8, lines: [[['100%', 'na'], [' ', 'n'], ...word('VEG', [])]] },
+];
+PHR.forEach(P => { P.z = 0; P.step = .05; P.L = phraseLayout(P); });
+
+// ---------- drawing helpers ----------
+const box = (x, y, z, w, d, h, col, o = {}) => iso.box(x, y, z, w, d, h, typeof col === 'string' ? tri(col) : col, { ...o, bias: -(z + h / 2) + (o.bias || 0), cull: false });
+function logo(g2, w, h) { // the BOWLISTA pill, drawn in metres around (0,0) on whatever plane we are in
+  const r = h / 2, lw = h * .13;
+  g2.beginPath(); g2.roundRect(-w / 2, -h / 2, w, h, r); g2.fillStyle = COBALT; g2.fill();
+  g2.beginPath(); g2.roundRect(-w / 2 + lw * .9, -h / 2 + lw * .9, w - lw * 1.8, h - lw * 1.8, r - lw); g2.lineWidth = lw; g2.strokeStyle = LIME; g2.stroke();
+  g2.save(); g2.scale(.01, .01); g2.font = `800 ${h * 52}px Jost`; g2.fillStyle = '#FFFFFF'; g2.textAlign = 'center'; g2.textBaseline = 'middle';
+  g2.letterSpacing = `${h * 1.5}px`; g2.fillText('BOWLISTA', 0, h * 3); g2.restore();
+}
+function menuBoard(g2, title, foods, w, h) {
+  g2.beginPath(); g2.roundRect(0, 0, w, h, .05); g2.fillStyle = '#FFFFFF'; g2.fill();
+  g2.save(); g2.scale(.01, .01); g2.font = '700 19px Jost'; g2.fillStyle = COBALT; g2.letterSpacing = '3px'; g2.fillText(title, 14, 28); g2.restore();
+  g2.fillStyle = LIME; g2.fillRect(.14, .34, .5, .03);
+  g2.fillStyle = '#C8C3B8'; for (let i = 0; i < 3; i++) g2.fillRect(.14, .48 + i * .1, w * .42, .035);
+  // a food plate: a kraft bowl seen from the side with colour on top
+  const cx = w * .74, cy = h * .64;
+  g2.beginPath(); g2.ellipse(cx, cy, .34, .14, 0, 0, TAU); g2.fillStyle = foods[0]; g2.fill();
+  foods.slice(1).forEach((c, i) => { g2.beginPath(); g2.ellipse(cx - .18 + i * .12, cy - .03 + (i % 2) * .05, .07, .045, 0, 0, TAU); g2.fillStyle = c; g2.fill(); });
+  g2.beginPath(); g2.moveTo(cx - .34, cy); g2.lineTo(cx + .34, cy); g2.lineTo(cx + .26, cy + .2); g2.lineTo(cx - .26, cy + .2); g2.closePath(); g2.fillStyle = KRAFT; g2.fill();
+}
+
+// the ground: paper mall floor with a faint tile grid, kitchen tiles, a lime lead-in line along the queue lane
+function ground(t) {
+  g.fillStyle = C.bg; g.fillRect(0, 0, W, H);
+  g.save(); g.strokeStyle = 'rgba(120,100,70,.10)'; g.lineWidth = 1; g.beginPath();
+  for (let x = -40; x <= 40; x += 1.2) { g.moveTo(...iso.P(x, -40, 0)); g.lineTo(...iso.P(x, 40, 0)); }
+  for (let y = -40; y <= 40; y += 1.2) { g.moveTo(...iso.P(-40, y, 0)); g.lineTo(...iso.P(40, y, 0)); }
+  g.stroke(); g.restore();
+  fillPoly(g, quad(rect(BACK, FRONT + .2, Y0 - .82, Y1 + .62), .001), '#ECE8E0');
+  const lead = seg(t, 3.0, 4.0);
+  if (lead > 0) fillPoly(g, quad(rect(2.38, 2.5, lerp(17, -4, 1) * 0 + 17 - 21 * eo(lead), 17), .002), LIME);
+}
+// accent marks for the rule: a stand-here outline at the screen, arrows growing ahead of the customer
+function marks(t) {
+  const out = (cx, cy, s, a) => { if (a <= 0) return; g.save(); g.globalAlpha = a; g.strokeStyle = TANG; g.lineWidth = Math.max(2, .07 * iso.cam.k); g.lineJoin = 'round';
+    const p = quad(rect(cx - s, cx + s, cy - s, cy + s), .003); g.beginPath(); p.forEach((q, i) => i ? g.lineTo(...q) : g.moveTo(...q)); g.closePath(); g.stroke(); g.restore(); };
+  out(LANEX, ST.pos, .42, seg(t, 5.2, 5.6) * (1 - seg(t, 7.8, 8.2)));
+  const arrow = (yA, yB, t0) => {
+    const grow = eo(seg(t, t0, t0 + .6)), fade = 1 - seg(t, t0 + 1.9, t0 + 2.4); if (grow <= 0 || fade <= 0) return;
+    const ys = yA - .45, ye = lerp(ys, yB + .35, grow), w = .1;
+    g.save(); g.globalAlpha = fade;
+    fillPoly(g, quad(rect(LANEX - w, LANEX + w, ye + .25, ys), .003), TANG);
+    fillPoly(g, [[LANEX - .3, ye + .3], [LANEX + .3, ye + .3], [LANEX, ye - .1]].map(p => iso.P(p[0], p[1], .003)), TANG);
+    g.restore();
+  };
+  arrow(ST.pos, ST.base, 7.6); arrow(ST.base, ST.fresh, 10.4); arrow(ST.fresh, ST.brew, 13.1); arrow(ST.brew, ST.pick, 16.5);
+}
+
+// ---------- the kiosk ----------
+function kiosk(t) {
+  const open = seg(t, 1.05, 1.85), drop = BOXH * (1 - ei(open));
+  // back wall: fascia logo and four menu boards (world signs, facing the camera side)
+  box(BACK, Y0 - .82, 0, .2, Y1 + 1.44, BOXH, COBALT, { layer: 0, decal: (I, d) => {
+    onPlane(g, d.x + d.w, 5.5, 3.25, 'yz', g2 => logo(g2, 4.2, .82));
+    const boards = [['BOWLS', [SUN, '#7FB24D', '#D9483B', '#8E5BA8']], ['WRAPS', ['#E9D3A6', '#7FB24D', '#D9483B']], ['SUBS', ['#D7A45C', '#7FB24D', '#F2C230']], ['COLD BREW', ['#5A3A26', '#E9D9C2']]];
+    boards.forEach(([tt, f], i) => onPlane(g, d.x + d.w, 10.5 - i * 2.55, 2.55, 'yz', g2 => menuBoard(g2, tt, f, 2.35, 1.05)));
+  } });
+  box(BACK, Y0 - .82, 0, FRONT + .22 - BACK, .12, Math.max(1.05, drop), COBALT, { layer: 0 });   // far side wall, cut low once open
+  box(BACK + .2, Y0, 0, .6, Y1, .92, STEEL, { layer: .5 });                                    // back prep counter
+  // front counter, in 1 m segments so it sorts by footprint against the people behind and in front of it
+  for (let y = Y0; y < Y1; y += 1) {
+    const last = y + 1 >= Y1;
+    box(0, y, 0, FRONT, 1, 1.05, COBALT, { faceColor: { 0: WHITE }, decal: (I, d) => {
+      onPlane(g, d.x + d.w, d.y + d.d, 0, 'yz', g2 => { g2.fillStyle = LIME; g2.fillRect(0, -.16, d.d, .08); g2.fillRect(0, -1.05, d.d, .05); });
+      if (y === 6) onPlane(g, d.x + d.w, 5.0, .55, 'yz', g2 => logo(g2, 3.0, .58));
+    } });
+  }
+  // stations on the counter top
+  const top = 1.05;
+  box(.25, ST.pos - .2, top, .3, .4, .06, NAVY, { bias: .6 });                                // POS base
+  box(.32, ST.pos - .16, top + .06, .08, .32, .4, NAVY, { bias: .6, faceColor: { 2: '#2B3C7A' } });   // POS screen
+  for (let k = 0; k < 3; k++) iso.cyl(.38, 8.75, top + k * .09, .15, .08, tri(KRAFT), { bias: -(top) + .6, n: 16 });   // bowl stack
+  for (let k = 0; k < 4; k++) iso.cyl(.38, 8.25 - .05, top + k * .03, .17, .025, tri('#E9D3A6'), { bias: -(top) + .6, n: 16 }); // wraps
+  for (let k = 0; k < 2; k++) box(.2, 7.55 + k * .18, top, .4, .12, .1, '#D7A45C', { bias: .6 });               // sub rolls
+  box(.1, 5.2, top, .7, 1.9, .1, STEEL, { bias: .6, decal: () => {
+    const cols = ['#7FB24D', '#D9483B', '#F2C230', '#8E5BA8', '#E8D9B0', '#5E9C3A', '#E07B39', '#C93A4B', '#9FC85A', '#F5E3A1'];
+    onPlane(g, .1, 7.1, top + .1, 'xy', g2 => { for (let i = 0; i < 10; i++) { const r = i % 2, c = (i / 2) | 0; g2.fillStyle = cols[i]; g2.beginPath(); g2.roundRect(.05 + c * .37, .07 + r * .3, .31, .24, .03); g2.fill(); } });
+  } });
+  box(.15, 3.05, top, .45, .5, .72, '#4A4E57', { bias: .6, faceColor: { 2: '#3A3E46' } });     // cold brew dispenser
+  box(.47, 3.18, top + .32, .12, .1, .08, STEEL, { bias: .7 });                               // tap
+  for (let k = 0; k < 3; k++) iso.cyl(.38, 2.75, top + k * .02, .06, .14, tri('#F3EFE6'), { bias: -(top) + .6, n: 12 });   // cups
+  // pickup shelf at the counter end, with delivery bags waiting on the upper board
+  box(.05, Y0 + .02, top, .8, .06, .95, WHITE, { bias: .6 }); box(.05, Y0 + .92, top, .8, .06, .95, WHITE, { bias: .65 });
+  box(.05, Y0 + .02, top + .45, .8, .96, .04, WHITE, { bias: .62 }); box(.05, Y0 + .02, top + .95, .8, .96, .04, WHITE, { bias: .62 });
+  bag(.45, Y0 + .3, top + .49, 1, .64); bag(.45, Y0 + .66, top + .49, 1, .66);
+  // the box shell: front and near-side panels drop into the floor as the lid comes off
+  if (drop > .01) {
+    const deco = (I, d) => {
+      onPlane(g, d.x + d.w, d.y + d.d, 0, 'yz', g2 => { g2.fillStyle = LIME; g2.fillRect(0, -.3, d.d, .14); });
+      onPlane(g, d.x + d.w, 5.4, 2.0 - (BOXH - d.h), 'yz', g2 => logo(g2, 6.4, 1.5));
+    };
+    box(FRONT + .1, Y0 - .82, 0, .12, Y1 + 1.44, drop, COBALT, { layer: 1.5, decal: deco });
+    box(BACK, Y1 + .5, 0, FRONT + .22 - BACK, .12, drop, COBALT, { layer: 1.5, decal: (I, d) => onPlane(g, d.x, d.y + d.d, 0, 'xz', g2 => { g2.fillStyle = LIME; g2.fillRect(0, -.3, d.w, .14); }) });
+  }
+}
+// the lid: hinged on its far edge, flips paper-side-up, then glides away
+function lid(t) {
+  const flip = eio(seg(t, .3, 1.3)), glide = ei(seg(t, 1.25, 2.0)); if (glide >= 1) return;
+  const th = flip * Math.PI * .97, hx = BACK, hz = BOXH, dx = -glide * 9, dz = glide * 7;
+  const M = (x, y) => [hx + (x - hx) * Math.cos(th) + dx, y, hz + (x - hx) * Math.sin(th) + dz];
+  const x1 = FRONT + .22, ya = Y0 - .82, yb = Y1 + .62;
+  const pts = [M(hx, ya), M(x1, ya), M(x1, yb), M(hx, yb)];
+  const up = Math.cos(th) - Math.sin(th) > 0;   // the cobalt top faces the camera until it turns past 45°
+  facet(g, pts, null, { both: true, color: up ? tri(COBALT)[0] : C.paper });
+  if (up) { const c = M(lerp(hx, x1, .5), 5.4); onPlane(g, c[0], 5.4, c[2] + .001, 'xy', g2 => { g2.globalAlpha = 1 - flip * 1.5; g2.rotate(0); }); }
+  // its thickness along the near edge
+  const e = .14, P2 = [M(x1, yb), M(hx, yb), [M(hx, yb)[0], yb, M(hx, yb)[2] - e], [M(x1, yb)[0], yb, M(x1, yb)[2] - e]];
+  facet(g, P2, null, { both: true, color: tri(COBALT)[1] });
+}
+
+// a kraft bag with a cobalt band and the lime ring
+function bag(x, y, z, grow = 1, bias = .7) {
+  if (grow <= 0) return;
+  box(x - .15, y - .15, z, .3, .26, .42 * grow, KRAFT, { bias, decal: (I, d) => {
+    if (grow > .5) onPlane(g, d.x + d.w, d.y + d.d, d.z + d.h * .55, 'yz', g2 => { g2.fillStyle = COBALT; g2.fillRect(0, -.07, d.d, .12); });
+  } });
+}
+// the order on the counter: bowl (base, then fillings), cup, then the bag
+function order(t) {
+  const top = 1.05;
+  if (t > 8.6 && t < BAG_T + .15) {
+    const by = bowlY(t), slide = eo(seg(t, 8.6, 9.2));
+    const bx = lerp(.38, .55, slide), yy = lerp(8.75, by, slide);
+    const fill = seg(t, 9.0, 9.6), tops = seg(t, 12.1, 13.1);
+    iso.bill(bx, yy, top, (gg) => {
+      gg.scale(1.45, 1.45);
+      gg.beginPath(); gg.moveTo(-.17, -.17); gg.lineTo(.17, -.17); gg.lineTo(.12, 0); gg.lineTo(-.12, 0); gg.closePath(); gg.fillStyle = tri(KRAFT)[1]; gg.fill();
+      gg.beginPath(); gg.moveTo(0, -.17); gg.lineTo(.17, -.17); gg.lineTo(.12, 0); gg.lineTo(0, 0); gg.closePath(); gg.fillStyle = tri(KRAFT)[2]; gg.fill();
+      gg.beginPath(); gg.ellipse(0, -.17, .17, .085, 0, 0, TAU); gg.fillStyle = tri(KRAFT)[0]; gg.fill();
+      if (fill > 0) { gg.beginPath(); gg.ellipse(0, -.175, .145 * fill, .07 * fill, 0, 0, TAU); gg.fillStyle = '#E7D9B5'; gg.fill(); }
+      const tc = ['#7FB24D', '#D9483B', '#F2C230', '#8E5BA8', '#5E9C3A'];
+      tc.forEach((c, i) => { const a = clamp(tops * 5 - i, 0, 1); if (a <= 0) return; const an = i / 5 * TAU; gg.beginPath(); gg.ellipse(Math.cos(an) * .07, -.18 + Math.sin(an) * .03, .045 * a, .025 * a, 0, 0, TAU); gg.fillStyle = c; gg.fill(); });
+    }, { bias: -top + .62 });
+  }
+  if (t > 14.3 && t < BAG_T + .15) {
+    const cy = t < 16.8 ? 3.55 : lerp(3.55, ST.pick - .22, eio(seg(t, 16.8, 18.4))), cx = lerp(.4, .55, eo(seg(t, 14.3, 14.6)));
+    const lvl = seg(t, 14.6, 15.3);
+    iso.bill(cx, cy, top, gg => {
+      gg.scale(1.4, 1.4);
+      gg.fillStyle = 'rgba(240,236,228,.95)'; gg.beginPath(); gg.moveTo(-.07, -.24); gg.lineTo(.07, -.24); gg.lineTo(.055, 0); gg.lineTo(-.055, 0); gg.closePath(); gg.fill();
+      if (lvl > 0) { const h = .22 * lvl; gg.fillStyle = '#5A3A26'; gg.beginPath(); gg.moveTo(-.055 - .015 * (h / .24), -h); gg.lineTo(.055 + .015 * (h / .24), -h); gg.lineTo(.055, 0); gg.lineTo(-.055, 0); gg.closePath(); gg.fill(); }
+      gg.fillStyle = LIME; gg.fillRect(-.065, -.15, .13, .05);
+    }, { bias: -top + .64 });
+  }
+  if (t >= BAG_T && t < TAKE_T + .02) {
+    const grow = eo(seg(t, BAG_T, BAG_T + .4)), up = eio(seg(t, SHELF_T, SHELF_T + .45));
+    bag(lerp(.55, .45, up), lerp(ST.pick - .05, Y0 + .5, up), top + up * .04, grow, .7);
+  }
+}
+
+// ---------- people ----------
+const PEOPLE = [
+  { id: 1, w: A, x: LANEX, p: { h: 1.72, top: TOPS.a, legs: LEGS[0] }, carry: true },
+  { id: 2, w: Bq, x: LANEX, p: { h: 1.66, top: TOPS.b, legs: LEGS[1], hairLong: true } },
+  { id: 3, w: Cq, x: LANEX, p: { h: 1.78, top: TOPS.c, legs: LEGS[2] } },
+  { id: 4, w: S1, x: -.72, p: { h: 1.74, top: TOPS.staff, legs: LEGS[3] }, staff: true },
+  { id: 5, w: S2, x: -.72, p: { h: 1.7, top: TOPS.staff, legs: LEGS[0], hairLong: true }, staff: true },
+  { id: 6, w: S3, x: -.72, p: { h: 1.76, top: TOPS.staff, legs: LEGS[2] }, staff: true },
+];
+function people(t) {
+  if (t < 1.6) return;                      // inside the closed box nobody is shown
+  for (const P of PEOPLE) {
+    const s = P.w(t); if (!s.on) continue;
+    globalThis.__POS?.push({ i: P.id, k: 'w', x: P.x, y: s.y, a: 1 });
+    const carrying = P.carry && t > TAKE_T;
+    iso.bill(P.x, s.y, 0, gg => {
+      drawPerson(gg, P.p, { walking: s.walking, phase: s.phase });
+      if (P.staff) { gg.beginPath(); gg.arc(0, -.9 * P.p.h, .07 * P.p.h, Math.PI * 1.05, TAU * .99); gg.fillStyle = NAVY; gg.fill(); gg.fillStyle = LIME; gg.fillRect(-.07 * P.p.h, -.9 * P.p.h, .14 * P.p.h, .012 * P.p.h); }
+      if (carrying) { const h = P.p.h, sw = s.walking ? Math.sin(s.phase) * .02 : 0; gg.fillStyle = tri(KRAFT)[1]; gg.fillRect(.13 * h, -.5 * h + sw, .15 * h, .17 * h); gg.fillStyle = tri(KRAFT)[2]; gg.fillRect(.23 * h, -.5 * h + sw, .05 * h, .17 * h); gg.fillStyle = COBALT; gg.fillRect(.13 * h, -.42 * h + sw, .15 * h, .03 * h); }
+    });
+  }
+}
+
+// ---------- subtitles: one cue per line, a pale bar in the lower safe area ----------
+function wrap(s, maxW) { const words = s.split(' '), out = []; let cur = ''; for (const w of words) { const n = cur ? cur + ' ' + w : w; if (g.measureText(n).width > maxW && cur) { out.push(cur); cur = w; } else cur = n; } out.push(cur); return out; }
+function subtitle(t) {
+  if (NOSUB) return;
+  const l = LINES.find(l => t >= l.t && t < l.t1); if (!l) return;
+  const sc = W / 1080;
+  g.save(); g.font = `500 ${46 * sc}px Newsreader`; const rows = wrap(l.text, 900 * sc), lh = 58 * sc;
+  const w = Math.max(...rows.map(r => g.measureText(r).width)) + 56 * sc, h = rows.length * lh + 30 * sc, y = H - 150 * sc - h;
+  g.fillStyle = 'rgba(250,245,234,.93)'; g.beginPath(); g.roundRect(W / 2 - w / 2, y, w, h, 8 * sc); g.fill();
+  g.fillStyle = C.ink; g.textAlign = 'center'; g.textBaseline = 'middle';
+  rows.forEach((r, i) => g.fillText(r, W / 2, y + 15 * sc + lh * (i + .5)));
+  g.restore();
+}
+
+// ---------- frame ----------
+let TEXT_LIST = [];
+function render(tf) {
+  const t = story(tf);
+  TEXT_LIST = [];
+  iso.g = g; iso.cam = camAt(t);
+  ground(t); marks(t);
+  for (const P of PHR) {
+    floorType(g, tf, P, P.L);
+    if (tf >= P.t0 && tf < P.t1) TEXT_LIST.push({ id: P.id, text: P.lines.map(l => l.map(s => s[0]).join('')).join(' '), ...phraseBox(P, P.L) });
+  }
+  kiosk(t); order(t); people(t);
+  iso.flush();
+  lid(t);
+  subtitle(tf);
+}
+
+// ---------- sound / cue events ----------
+const EV = [];
+EV.push({ t: .3, type: 'lid' }, { t: 1.05, type: 'panels' }, { t: 1.3, type: 'chime' });
+PHR.forEach(P => P.L.forEach((c, i) => EV.push({ t: c.tc, type: 'land', accent: c.col === C.accent, i, pan: 0 })));
+PEOPLE.filter(P => !P.staff).forEach(P => { for (let t = 0; t < DUR; t += 1 / 30) { const a = P.w(t), b = P.w(t + 1 / 30); if (Math.floor(a.phase / Math.PI) !== Math.floor(b.phase / Math.PI) && b.walking && P.id === 1) EV.push({ t, type: 'step', pan: .1 }); } });
+EV.push({ t: 7.0, type: 'tap' }, { t: 7.25, type: 'tap' }, { t: 7.5, type: 'tap' });
+EV.push({ t: 8.6, type: 'bowl' }, { t: 9.0, type: 'scoop' });
+for (let i = 0; i < 5; i++) EV.push({ t: 12.1 + i * .2, type: 'scoop' });
+EV.push({ t: 14.3, type: 'cup' }, { t: 14.6, type: 'pour' }, { t: BAG_T, type: 'bag' }, { t: SHELF_T + .4, type: 'shelf' }, { t: TAKE_T, type: 'bag' });
+for (let i = EV.length - 1; i >= 0; i--) { const e = EV[i]; if (e.type === 'land') continue; const f = toFilm(e.t); if (f === null) EV.splice(i, 1); else e.t = f; }
+SEGS.slice(1).forEach(([f0]) => EV.push({ t: f0, type: 'cut' }));
+LINES.forEach(l => EV.push({ t: l.t, type: 'voice', id: l.id }));
+
+window.DUR = DUR; window.EV = EV; window.render = render;
+window.TEXTS = t => { render(t); return TEXT_LIST.slice(); };
+Promise.all([document.fonts.load('600 40px Newsreader'), document.fonts.load('800 40px Jost'), document.fonts.load('700 40px Jost')]).then(() => { render(0); window.READY = true; });
+</script></body></html>
