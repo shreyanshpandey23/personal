@@ -1,0 +1,14 @@
+Whose Cone? — credits for third-party assets
+
+Fonts
+- Inter (variable), Rasmus Andersson — SIL Open Font License 1.1 — https://github.com/google/fonts/tree/main/ofl/inter
+- IBM Plex Mono Medium, IBM — SIL Open Font License 1.1 — https://github.com/google/fonts/tree/main/ofl/ibmplexmono
+
+Picture
+- three.js (MIT) for 3D rendering. All models, shading and animation drawn in code for this film.
+
+Sound
+- All music and sound effects synthesised in code (numpy/scipy); no samples or recordings.
+- Procedural foley helpers from the Lemo-Opuscar library core/audio/sfx.py (MIT).
+
+No voice, no third-party images or footage.

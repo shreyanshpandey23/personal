@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Whose Cone?</title>
+<style>
+@font-face{font-family:Inter;src:url(fonts/Inter.ttf);font-weight:100 900}
+@font-face{font-family:PlexMono;src:url(fonts/PlexMono.ttf)}
+html,body{margin:0;background:#F3F0EA;overflow:hidden}
+canvas{position:absolute;left:0;top:0;display:block}
+</style></head>
+<body>
+<script type="importmap">{"imports":{"three":"/node_modules/three/build/three.module.js"}}</script>
+<script type="module">
+import * as THREE from 'three';
+THREE.ColorManagement.enabled = false;
+
+const W = innerWidth, H = innerHeight, PR = 2;
+const DUR = 10.0;
+const C = {
+  ground: '#F3F0EA', neutral: '#DDD8CF', ink: '#25282D', grey: '#8D8F93',
+  puppy: '#E6B94F', scoop: '#79B09F', hippo: '#8A97D4', accent: '#E8472A'
+};
+const col = h => new THREE.Color(h);
+
+// ---------- helpers ----------
+const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+const seg = (t, a, b) => clamp((t - a) / (b - a), 0, 1);
+const ss = x => x * x * (3 - 2 * x);
+const eio = x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+const eo = x => 1 - Math.pow(1 - x, 3);
+const lerp = (a, b, k) => a + (b - a) * k;
+const v3 = (x, y, z) => new THREE.Vector3(x, y, z);
+
+// master clock: speed curve, integrated
+function speed(t) {
+  if (t < 5.4) return 1;
+  if (t < 5.9) return lerp(1, 1 / 8, ss(seg(t, 5.4, 5.9)));
+  if (t < 6.9) return 1 / 8;
+  if (t < 7.3) return lerp(1 / 8, 1, ss(seg(t, 6.9, 7.3)));
+  return 1;
+}
+const TAU = []; { let acc = 0; const dt = 1 / 480; for (let i = 0; i <= DUR * 480 + 2; i++) { TAU.push(acc); acc += speed(i * dt) * dt; } }
+const tau = t => { const f = clamp(t, 0, DUR) * 480, i = Math.floor(f); return lerp(TAU[i], TAU[i + 1], f - i); };
+const T_POP = 6.3, T_LAND = 7.1;
+const TAU_POP = tau(T_POP), TAU_LAND = tau(T_LAND);
+
+// ---------- renderer ----------
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(PR); renderer.setSize(W, H);
+renderer.setClearColor(col(C.ground)); renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
+document.body.appendChild(renderer.domElement);
+const ov = document.createElement('canvas'); ov.width = W * PR; ov.height = H * PR;
+ov.style.width = W + 'px'; ov.style.height = H + 'px'; document.body.appendChild(ov);
+const g = ov.getContext('2d');
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(40, W / H, 0.05, 50);
+const L = v3(-0.45, 0.85, 0.55).normalize();
+
+// ---------- systems (one hue each, dye front) ----------
+const sRGB = h => { const c = col(h); return new THREE.Vector3(c.r, c.g, c.b); };
+function system(hue) { return { uHue: { value: sRGB(hue) }, uOrigin: { value: v3(0, 0, 0) }, uR: { value: 0 } }; }
+const SYS = { neutral: system(C.neutral), hippo: system(C.hippo), puppy: system(C.puppy), scoop: system(C.scoop), cherry: system(C.accent) };
+SYS.neutral.uR.value = 99;
+
+const VS = `
+varying vec3 vW; varying vec3 vN;
+uniform float uW; uniform float uPush;
+void main(){
+  vec4 w = modelMatrix * vec4(position,1.);
+  vec3 n = normalize(transpose(inverse(mat3(modelMatrix))) * normal);
+  w.xyz += n * uPush * uW * length(cameraPosition - w.xyz);
+  vW = w.xyz; vN = n;
+  gl_Position = projectionMatrix * viewMatrix * w;
+}`;
+const FS = `
+varying vec3 vW; varying vec3 vN;
+uniform vec3 uHue, uNeutral, uOrigin, uL, uInk; uniform float uR, uLine;
+void main(){
+  float d = distance(vW, uOrigin);
+  float k = 1. - smoothstep(uR - .012, uR, d);
+  vec3 base = mix(uNeutral, uHue, k);
+  float edge = (uR > .001 && uR < 5.) ? smoothstep(.022, .0, abs(d - uR)) : 0.;
+  base = mix(base, vec3(1.), edge * .35);
+  if (uLine > .5) { gl_FragColor = vec4(mix(base * .52, uInk, .28), 1.); return; }
+  float ndl = dot(normalize(vN), uL);
+  float lit = smoothstep(.0, .08, ndl);
+  float away = smoothstep(-.35, -.5, ndl);
+  vec3 shade = base * .80 * vec3(.96, .985, 1.045);
+  vec3 col = mix(shade, base, lit);
+  col = mix(col, base * .70 * vec3(.95, .98, 1.06), away);
+  gl_FragColor = vec4(col, 1.);
+}`;
+const neutralV = sRGB(C.neutral), inkV = sRGB(C.ink);
+function mats(sys) {
+  const common = { uHue: sys.uHue, uOrigin: sys.uOrigin, uR: sys.uR, uNeutral: { value: neutralV }, uL: { value: L }, uInk: { value: inkV }, uW: { value: 0.00075 } };
+  const fill = new THREE.ShaderMaterial({ vertexShader: VS, fragmentShader: FS, uniforms: { ...common, uPush: { value: 0 }, uLine: { value: 0 } } });
+  const line = new THREE.ShaderMaterial({ vertexShader: VS, fragmentShader: FS, side: THREE.BackSide, uniforms: { ...common, uPush: { value: 1 }, uLine: { value: 0 } } });
+  line.uniforms.uLine = { value: 1 };
+  return { fill, line };
+}
+const M = {}; for (const k in SYS) M[k] = mats(SYS[k]);
+const inkMat = new THREE.MeshBasicMaterial({ color: col(C.ink) });
+
+const SPH = new THREE.SphereGeometry(1, 48, 32);
+// a part: fill + own-colour outline (inverted hull), sharing a transform
+function part(parent, geo, m, p = [0, 0, 0], s = [1, 1, 1], r = [0, 0, 0]) {
+  const grp = new THREE.Group();
+  grp.add(new THREE.Mesh(geo, m.fill), new THREE.Mesh(geo, m.line));
+  grp.position.set(...p); grp.scale.set(...s); grp.rotation.set(...r);
+  parent.add(grp); return grp;
+}
+function inkDot(parent, p, r) { const m = new THREE.Mesh(SPH, inkMat); m.position.set(...p); m.scale.setScalar(r); parent.add(m); return m; }
+// boxes outline by a slightly larger box (normals of a box split at corners)
+function box(parent, w, h, d, p, r = [0, 0, 0], m = M.neutral) {
+  const grp = new THREE.Group(); const e = .007;
+  grp.add(new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m.fill));
+  const lm = m.line.clone(); lm.uniforms = { ...m.line.uniforms, uPush: { value: 0 } };
+  grp.add(new THREE.Mesh(new THREE.BoxGeometry(w + e, h + e, d + e), lm));
+  grp.position.set(...p); grp.rotation.set(...r); parent.add(grp); return grp;
+}
+
+// ---------- bench (neutral) ----------
+const SEAT = 0.45;
+for (const z of [-.165, -.055, .055, .165]) box(scene, 2.5, .03, .095, [0, SEAT - .015, z]);
+for (const [y, z] of [[.60, -.255], [.72, -.285], [.84, -.315]]) box(scene, 2.5, .095, .03, [0, y, z], [-.25, 0, 0]);
+for (const x of [-1.17, 1.17]) {
+  box(scene, .05, .045, .5, [x, .66, .0]);                         // armrest
+  box(scene, .05, .66, .05, [x, .33, .21]);                        // front leg
+  box(scene, .05, .9, .05, [x, .45, -.26], [-.22, 0, 0]);          // back leg
+  box(scene, .05, .05, .48, [x, .2, -.02]);                        // stretcher
+}
+// soft contact shadow
+{
+  const cv = document.createElement('canvas'); cv.width = cv.height = 256; const c = cv.getContext('2d');
+  const gr = c.createRadialGradient(128, 128, 10, 128, 128, 128); gr.addColorStop(0, 'rgba(37,40,45,1)'); gr.addColorStop(1, 'rgba(37,40,45,0)');
+  c.fillStyle = gr; c.fillRect(0, 0, 256, 256);
+  const sh = new THREE.Mesh(new THREE.PlaneGeometry(3.1, 1.0), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(cv), transparent: true, opacity: .2, depthWrite: false }));
+  sh.rotation.x = -Math.PI / 2; sh.position.y = .002; scene.add(sh);
+}
+
+// ---------- hippo (grey-violet) ----------
+const hippo = new THREE.Group(); scene.add(hippo);
+const hBody = new THREE.Group(); hippo.add(hBody);
+part(hBody, SPH, M.hippo, [0, .21, 0], [.2, .23, .18]);
+const hHead = new THREE.Group(); hHead.position.set(0, .45, .02); hBody.add(hHead);
+part(hHead, SPH, M.hippo, [0, .05, -.02], [.165, .15, .15]);
+part(hHead, SPH, M.hippo, [0, -.035, .1], [.2, .135, .145]);             // big muzzle
+inkDot(hHead, [-.06, .03, .235], .016); inkDot(hHead, [.06, .03, .235], .016);       // nostrils on the front of the muzzle
+inkDot(hHead, [-.06, .135, .11], .019); inkDot(hHead, [.06, .135, .11], .019);       // eyes high on the head
+part(hHead, SPH, M.hippo, [-.115, .19, -.03], [.038, .042, .022], [0, 0, .3]);
+part(hHead, SPH, M.hippo, [.115, .19, -.03], [.038, .042, .022], [0, 0, -.3]);
+part(hippo, SPH, M.hippo, [-.09, .05, .17], [.07, .065, .14]);          // legs, forward
+part(hippo, SPH, M.hippo, [.09, .05, .17], [.07, .065, .14]);
+part(hippo, SPH, M.hippo, [-.09, .055, .31], [.072, .072, .03]);         // foot pads
+part(hippo, SPH, M.hippo, [.09, .055, .31], [.072, .072, .03]);
+
+// ---------- puppy (warm yellow) ----------
+const puppy = new THREE.Group(); scene.add(puppy);
+const pBody = new THREE.Group(); puppy.add(pBody);
+part(pBody, SPH, M.puppy, [0, .16, 0], [.14, .17, .15]);
+const pHead = new THREE.Group(); pHead.position.set(0, .38, .03); pBody.add(pHead);
+part(pHead, SPH, M.puppy, [0, .02, 0], [.125, .115, .115]);
+part(pHead, SPH, M.puppy, [0, -.025, .11], [.07, .058, .1]);            // snout
+inkDot(pHead, [0, .005, .205], .022);                                      // nose
+inkDot(pHead, [-.05, .06, .1], .016); inkDot(pHead, [.05, .06, .1], .016);
+const earL = part(pHead, SPH, M.puppy, [-.12, -.03, -.0], [.048, .12, .026], [0, 0, .25]);
+const earR = part(pHead, SPH, M.puppy, [.12, -.03, -.0], [.048, .12, .026], [0, 0, -.25]);
+const tail = part(puppy, SPH, M.puppy, [0, .12, -.16], [.025, .09, .025], [-.7, 0, 0]);
+part(puppy, SPH, M.puppy, [-.07, .04, .13], [.05, .045, .11]);
+part(puppy, SPH, M.puppy, [.07, .04, .13], [.05, .045, .11]);
+
+// ---------- cone, scoop, cherry ----------
+const cone = new THREE.Group(); scene.add(cone);
+{ const cg = new THREE.ConeGeometry(.062, .2, 40); cg.rotateX(Math.PI); part(cone, cg, M.neutral, [0, -.1, 0]); }
+const scoop = new THREE.Group(); scene.add(scoop);
+const scoopBall = part(scoop, SPH, M.scoop, [0, 0, 0], [.085, .08, .085]);
+const cherry = part(scoop, SPH, M.cherry, [0, .095, 0], [.028, .028, .028]);
+
+// ---------- arms (capsules stretched between shoulder and hand) ----------
+function arm2(m, r) { const grp = part(scene, new THREE.CylinderGeometry(1, 1, 1, 24, 1, true), m); const a = part(grp, SPH, m), b = part(grp, SPH, m); grp.userData = { r, a, b }; return grp; }
+function setArm2(o, p0, p1) {
+  const { r, a, b } = o.userData; const d = p1.clone().sub(p0), len = Math.max(.001, d.length());
+  o.position.copy(p0).add(p1).multiplyScalar(.5);
+  o.quaternion.setFromUnitVectors(v3(0, 1, 0), d.clone().normalize());
+  o.scale.set(r, len, r);
+  a.position.set(0, .5, 0); a.scale.set(1, 1 / len * r, 1);
+  b.position.set(0, -.5, 0); b.scale.set(1, 1 / len * r, 1);
+}
+const hArmIn = arm2(M.hippo, .05), hArmOut = arm2(M.hippo, .05);
+const pArmIn = arm2(M.puppy, .036), pArmOut = arm2(M.puppy, .036);
+
+// ---------- camera keys (one continuous take) ----------
+// [t, position, target]
+const CAMS = [
+  [0.0, v3(.22, 1.08, .62), v3(0, .96, .12)],
+  [2.2, v3(.8, 1.35, 3.05), v3(0, .86, .05)],
+  [5.3, v3(-.62, 1.15, 3.15), v3(0, .86, .05)],
+  [6.6, v3(-.38, 1.02, 2.15), v3(0, .86, .1)],
+  [7.4, v3(-.3, 1.08, 2.3), v3(0, .8, .08)],
+  [10., v3(.12, 3.0, 2.1), v3(0, .72, .04)],
+];
+const CAM_EASE = [eo, eio, eio, eio, eio];
+function camAt(t) {
+  let i = 0; while (i < CAMS.length - 2 && t > CAMS[i + 1][0]) i++;
+  const [t0, p0, q0] = CAMS[i], [t1, p1, q1] = CAMS[i + 1];
+  const k = CAM_EASE[i](seg(t, t0, t1));
+  // the orbit segment moves on an arc around the bench, not a chord
+  if (i === 1) {
+    const a0 = Math.atan2(p0.x, p0.z), a1 = Math.atan2(p1.x, p1.z);
+    const r0 = Math.hypot(p0.x, p0.z), r1 = Math.hypot(p1.x, p1.z);
+    const a = lerp(a0, a1, k), r = lerp(r0, r1, k);
+    return [v3(Math.sin(a) * r, lerp(p0.y, p1.y, k), Math.cos(a) * r), q0.clone().lerp(q1, k)];
+  }
+  return [p0.clone().lerp(p1, k), q0.clone().lerp(q1, k)];
+}
+
+// ---------- the mechanism ----------
+const CONE_HOME = v3(0, .8, .13);
+function tugX(T) {          // T = scaled time; a pull on every beat, alternating, growing
+  const env = ss(seg(T, 2.0, 2.5));
+  const A = lerp(.11, .17, seg(T, 2.5, 5.5));
+  return env * A * Math.sin(2 * Math.PI * (T - 2.25));
+}
+function state(t) {
+  const T = tau(t);
+  const popped = T >= TAU_POP;
+  const cx = tugX(Math.min(T, TAU_POP));
+  const recoil = popped ? Math.exp(-(t - T_POP) * 2.2) * Math.sin((t - T_POP) * 7) * .5 + (1 - Math.exp(-(t - T_POP) * 3)) * .5 : 0;
+  const lean = ss(seg(t, 7.6, 8.4));
+  return { T, popped, cx, recoil, lean };
+}
+
+function update(t) {
+  const S = state(t);
+  // characters lean with the tug: the puller leans back, the other is dragged in
+  const hx = -.43 + S.cx * .35, px = .43 + S.cx * .35;
+  hippo.position.set(hx - S.recoil * .03, SEAT, 0);
+  hippo.rotation.set(0, .75, 0);
+  puppy.position.set(px + S.recoil * .03, SEAT, .02);
+  puppy.rotation.set(0, -.8, 0);
+  hBody.rotation.set(-S.cx * .6 + S.lean * .22, 0, -S.cx * .5 - S.recoil * .08);
+  pBody.rotation.set(S.cx * .6 + S.lean * .26, 0, -S.cx * .6 + S.recoil * .1);
+  // lick bobs on the beat at the end
+  const lick = t > 8.4 ? Math.max(0, Math.sin(Math.PI * 2 * (t - 8.5))) : 0;
+  hHead.rotation.set(S.lean * .25 + (Math.floor((t - 8.5) * 2) % 2 === 0 ? lick * .12 : 0), 0, 0);
+  pHead.rotation.set(S.lean * .3 + (Math.floor((t - 8.5) * 2) % 2 === 1 ? lick * .14 : 0), 0, Math.sin(S.T * 6) * .04);
+  earL.rotation.z = .25 + Math.sin(S.T * 9) * .12 * (1 - S.lean); earR.rotation.z = -.25 - Math.sin(S.T * 9 + 1) * .12 * (1 - S.lean);
+  tail.rotation.z = Math.sin(S.T * 14) * .5;
+
+  // cone and scoop
+  let conePos;
+  if (!S.popped) conePos = CONE_HOME.clone().add(v3(S.cx, Math.abs(Math.sin(2 * Math.PI * (S.T - 2.25))) * .012, 0));
+  else { // the hippo keeps the empty cone, pulled back to itself
+    const k = ss(seg(t, T_POP, T_POP + .9));
+    conePos = CONE_HOME.clone().add(v3(tugX(TAU_POP), 0, 0)).lerp(v3(-.24, .72, .2), k);
+  }
+  cone.position.copy(conePos); cone.rotation.set(0, 0, S.popped ? ss(seg(t, T_POP, 7.2)) * .5 : -S.cx * .6);
+  const top = conePos.clone().add(v3(0, .045, 0));
+  let sp, squash = 0;
+  if (!S.popped) { sp = top; scoop.rotation.set(0, 0, cone.rotation.z * .6); }
+  else {
+    const p = clamp((S.T - TAU_POP) / (TAU_LAND - TAU_POP), 0, 1);
+    const land = v3(0, SEAT + .07, .06);
+    sp = top.clone().lerp(land, p); sp.y = lerp(top.y, land.y, p) + .32 * 4 * p * (1 - p);
+    scoop.rotation.set(p * 2.2, 0, p * 6.28 * 1.25 * (p < 1 ? 1 : 1));
+    if (t > T_LAND) { const u = t - T_LAND; squash = Math.exp(-u * 6) * Math.cos(u * 22) * .35; scoop.rotation.set(0, 0, 0); }
+    else if (p >= 1) scoop.rotation.set(0, 0, 0);
+  }
+  scoop.position.copy(sp);
+  scoopBall.scale.set(.085 * (1 + squash * .6), .08 * (1 - squash), .085 * (1 + squash * .6));
+  if (t > T_LAND) scoop.position.y = SEAT + .07 - .08 * squash * .5 - (t > T_LAND ? .012 : 0);
+
+  // arms: inner hand on the cone (puppy lets go at the pop), outer hand on the lap
+  hippo.updateMatrixWorld(true); puppy.updateMatrixWorld(true);
+  const hs = hBody.localToWorld(v3(.15, .31, .05)), hs2 = hBody.localToWorld(v3(-.16, .3, .04));
+  const ps = pBody.localToWorld(v3(-.1, .23, .06)), ps2 = pBody.localToWorld(v3(.1, .22, .05));
+  const hHand = conePos.clone().add(v3(-.055, -.035, .01));
+  const pGrip = conePos.clone().add(v3(.05, -.02, .01));
+  const pRest = pBody.localToWorld(v3(-.07, .1, .15));
+  const let_go = ss(seg(t, T_POP, T_POP + .7));
+  const pReach = S.lean > 0 ? pRest.clone().lerp(v3(.07, SEAT + .03, .1), S.lean) : pRest;
+  const pHand = pGrip.clone().lerp(pReach, let_go);
+  setArm2(hArmIn, hs, hHand);
+  setArm2(hArmOut, hs2, hBody.localToWorld(v3(-.13, .11, .15)));
+  setArm2(pArmIn, ps, pHand);
+  setArm2(pArmOut, ps2, pBody.localToWorld(v3(.08, .09, .14)));
+
+  // dye: colour spreads from where each system meets the cone
+  SYS.scoop.uOrigin.value.copy(sp); SYS.scoop.uR.value = .32 * ss(seg(t, .5, 1.1));
+  SYS.hippo.uOrigin.value.copy(hHand); SYS.hippo.uR.value = 1.2 * ss(seg(t, 1.0, 1.75));
+  SYS.puppy.uOrigin.value.copy(pGrip); SYS.puppy.uR.value = 1.0 * ss(seg(t, 1.45, 2.2));
+  // the cherry is the accent only at its moments: the opening detail and the pop
+  const acc = 1 - ss(seg(t, 1.9, 2.4)) + ss(seg(t, 5.6, 5.9)) - ss(seg(t, 7.5, 8.0));
+  SYS.cherry.uOrigin.value.copy(sp).add(v3(0, .095, 0)); SYS.cherry.uR.value = acc > .5 ? 99 : 0;
+  SYS.cherry.uR.value = 99;
+  SYS.cherry.uHue.value.copy(sRGB(C.neutral).lerp(sRGB(C.accent), clamp(acc, 0, 1)));
+
+  // camera
+  const [cp, ct] = camAt(t);
+  camera.position.copy(cp); camera.lookAt(ct);
+  camera.updateMatrixWorld(); camera.updateProjectionMatrix();
+  return { S, hHand, pGrip, sp };
+}
+
+// ---------- overlay: labels, headline, verdict ----------
+const proj = p => { const q = p.clone().project(camera); return [(q.x + 1) / 2 * W, (1 - q.y) / 2 * H]; };
+let TEXT_LIST = [];
+function txt(id, s, x, y, font, color, align = 'left', alpha = 1, pass = false, clipK = 1) {
+  g.save(); g.font = font; g.fillStyle = color; g.globalAlpha = alpha; g.textAlign = align; g.textBaseline = 'alphabetic';
+  const w = g.measureText(s).width; const size = parseFloat(font.match(/(\d+)px/)[1]);
+  const x0 = align === 'center' ? x - w / 2 : align === 'right' ? x - w : x;
+  if (clipK < 1) { g.beginPath(); g.rect(x0 * PR - 4, (y - size * 1.2) * PR, (w * clipK) * PR + 4, size * 1.6 * PR); g.clip(); }
+  g.scale(PR, PR); g.fillText(s, x, y); g.restore();
+  if (alpha > .01) TEXT_LIST.push({ id, text: s, x0, y0: y - size, x1: x0 + w, y1: y + size * .25, pass });
+  return w;
+}
+function leader(a, b, color, k = 1, alpha = 1) {
+  g.save(); g.globalAlpha = alpha; g.strokeStyle = color; g.lineWidth = 1.6 * PR; g.lineCap = 'round';
+  g.beginPath(); g.moveTo(a[0] * PR, a[1] * PR); g.lineTo(lerp(a[0], b[0], k) * PR, lerp(a[1], b[1], k) * PR); g.stroke();
+  g.fillStyle = color; g.beginPath(); g.arc(a[0] * PR, a[1] * PR, 4.5 * PR * Math.min(1, k * 3), 0, 7); g.fill(); g.restore();
+}
+function dot(x, y, r, color, alpha = 1) { g.save(); g.globalAlpha = alpha; g.fillStyle = color; g.beginPath(); g.arc(x * PR, y * PR, r * PR, 0, 7); g.fill(); g.restore(); }
+
+// a label grows out of its part: leader draws, colour dot pops, text slides in
+function label(id, t, t0, t1, anchorW, pin, hue, name, line, alignRight) {
+  if (t < t0 || t > t1 + .3) return;
+  const kin = seg(t, t0, t0 + .35), kout = 1 - seg(t, t1, t1 + .3);
+  const a = proj(anchorW);
+  leader(a, pin, C.ink, eo(kin), kout);
+  const k2 = eo(seg(t, t0 + .2, t0 + .5));
+  const dx = alignRight ? -1 : 1;
+  dot(pin[0] + dx * 12, pin[1] - 10, 8 * k2, hue, kout);
+  if (k2 > 0) {
+    const off = (1 - k2) * 18 * dx;
+    // report full text from its first frame (readcheck)
+    txt(id, name + ' ' + line, -9999, -9999, '600 30px Inter', 'rgba(0,0,0,0)');
+    TEXT_LIST.pop();
+    const al = alignRight ? 'right' : 'left';
+    const xx = pin[0] + dx * 30 + off;
+    const w1 = txt(id + 'n', name, xx, pin[1], '640 31px Inter', C.ink, al, kout * k2);
+    const w2 = txt(id + 'l', line, xx, pin[1] + 28, '500 19px Inter', '#5D6066', al, kout * k2);
+    TEXT_LIST.splice(TEXT_LIST.length - 2, 2);
+    const x0 = alignRight ? xx - Math.max(w1, w2) : xx;
+    TEXT_LIST.push({ id, text: name + ' ' + line, x0, y0: pin[1] - 31, x1: x0 + Math.max(w1, w2), y1: pin[1] + 34 });
+  }
+}
+
+function overlay(t, st) {
+  g.clearRect(0, 0, ov.width, ov.height); TEXT_LIST = [];
+  // figure line (tertiary)
+  txt('fig', 'FIG. 1 · ONE CONE, TWO PULLS', 60, 92, '500 15px PlexMono', C.grey, 'left', .9 * seg(t, .1, .5), true);
+  // headline
+  if (t < 3.1) {
+    const k = eo(seg(t, .3, .75)), out = 1 - seg(t, 2.8, 3.1);
+    txt('head', 'Whose cone?', 60 - (1 - k) * 20, 190, '650 72px Inter', C.ink, 'left', k * out);
+  }
+  // colour key, bottom right (colour is the legend)
+  const keys = [['HIPPO', C.hippo, 1.0], ['SCOOP', C.scoop, .5], ['PUPPY', C.puppy, 1.45]];
+  keys.forEach(([n, c, t0], i) => {
+    const k = eo(seg(t, t0 + .1, t0 + .5)); if (k <= 0) return;
+    const y = H - 150 + i * 36;
+    dot(W - 196, y - 6, 9 * k, c);
+    txt('key' + i, n, W - 176, y, '500 17px PlexMono', C.ink, 'left', k, true);
+  });
+  // the pair of labels, during the tug
+  const hp = st.S.popped ? null : 1;
+  label('hip', t, 2.55, 5.55, hHead.localToWorld(v3(-.05, .18, 0)), [70, 330], C.hippo, 'Hippo', 'holds the cone', false);
+  label('pup', t, 2.75, 5.6, pHead.localToWorld(v3(.03, .13, 0)), [W - 70, 470], C.puppy, 'Puppy', 'wants the cone', true);
+  // speed tag in slow motion
+  if (t > 5.55 && t < 7.45) {
+    const k = seg(t, 5.55, 5.8) * (1 - seg(t, 7.2, 7.45));
+    g.save(); g.globalAlpha = k; g.fillStyle = C.accent; g.fillRect((W / 2 - 92) * PR, 150 * PR, 184 * PR, 44 * PR); g.restore();
+    txt('slow', '1/8 SPEED', W / 2, 181, '600 22px PlexMono', '#FFFFFF', 'center', k, true);
+  }
+  // the verdict: number primary, the two ends with leaders
+  if (t > 7.5) {
+    const k = eo(seg(t, 7.5, 7.95));
+    const k2 = eo(seg(t, 7.75, 8.2));
+    const yN = 300;
+    txt('verdict', '50 : 50', W / 2, yN, '700 150px Inter', C.ink, 'center', k);
+    const ha = proj(hHead.localToWorld(v3(0, .17, 0))), pa = proj(pHead.localToWorld(v3(0, .13, 0)));
+    leader(ha, [W / 2 - 190, yN + 30], C.ink, k2, k2);
+    leader(pa, [W / 2 + 190, yN + 30], C.ink, k2, k2);
+    txt('shared', 'SHARED', W / 2, yN + 62, '600 26px PlexMono', C.accent, 'center', k2);
+    // treat number + word as one piece for reading time
+    const i1 = TEXT_LIST.findIndex(o => o.id === 'verdict'), i2 = TEXT_LIST.findIndex(o => o.id === 'shared');
+    if (i1 >= 0) { const a = TEXT_LIST[i1], b = i2 >= 0 ? TEXT_LIST[i2] : null; TEXT_LIST = TEXT_LIST.filter(o => o !== a && o !== b); TEXT_LIST.push({ id: 'verdict', text: '50 : 50 SHARED', x0: a.x0, y0: a.y0, x1: a.x1, y1: yN + 70 }); }
+  }
+}
+
+// ---------- sound / cue events ----------
+const EV = [];
+EV.push({ t: .15, type: 'whoosh', pan: .3 });
+EV.push({ t: .5, type: 'dye', note: 79, pan: 0 }, { t: 1.0, type: 'dye', note: 83, pan: -.5 }, { t: 1.5, type: 'dye', note: 86, pan: .5 });
+for (let b = 0; b < 7; b++) { const T = 2.5 + b * .5; if (T >= TAU_POP) break; let t = T; // real time of each pull
+  EV.push({ t, type: 'tug', who: b % 2 ? 'hippo' : 'puppy', pan: b % 2 ? -.45 : .45 }); }
+EV.push({ t: 5.55, type: 'slow' }, { t: T_POP, type: 'pop', pan: 0 }, { t: T_POP + .05, type: 'arc', pan: 0 }, { t: T_LAND, type: 'splat', pan: 0 });
+for (let i = 0; i < 3; i++) EV.push({ t: 8.5 + i * .5, type: 'lick', pan: i % 2 ? .4 : -.4 });
+EV.push({ t: 7.5, type: 'verdict' });
+
+window.DUR = DUR; window.EV = EV;
+window.TEXTS = t => { render(t); return TEXT_LIST.slice(); };
+function render(t) { const st = update(t); renderer.render(scene, camera); overlay(t, st); }
+window.render = render;
+document.fonts.load('600 30px Inter').then(() => document.fonts.load('500 15px PlexMono')).then(() => { render(0); window.READY = true; });
+</script></body></html>
