@@ -1,0 +1,26 @@
+{
+  "business": "Eventify (manual pilot stage, Lucknow)",
+  "unit": "shift",
+  "price": 112.50,
+  "variable": [
+    {"label": "Payment gateway fee (~2% of ₹690 organiser payment)", "cost": 14},
+    {"label": "Payout transfer to worker (bank/UPI payout fee)", "cost": 5},
+    {"label": "No-show guarantee reserve (5% of shifts x ₹200 replacement premium)", "cost": 10},
+    {"label": "Calls, SMS, WhatsApp per shift", "cost": 3}
+  ],
+  "fixed_monthly": [
+    {"label": "Ops coordinator (1 person, part/full time)", "cost": 15000},
+    {"label": "Marketing to organisers and workers", "cost": 10000},
+    {"label": "Phone, WhatsApp Business, tools", "cost": 2000},
+    {"label": "Travel and misc", "cost": 3000}
+  ],
+  "startup": [
+    {"label": "Company registration and basic legal", "cost": 10000},
+    {"label": "Simple website and booking forms", "cost": 10000},
+    {"label": "Crew T-shirts and ID cards (50 workers)", "cost": 15000},
+    {"label": "Launch marketing", "cost": 15000}
+  ],
+  "days_per_month": 30,
+  "plan_per_day": 40,
+  "ramp_per_day": [3, 6, 10, 14, 18, 22, 26, 30, 33, 36, 38, 40]
+}
