@@ -24,7 +24,7 @@ const FACE0 = 330, STEP = 60, HITS = 6;                    // tunnel face before
 const hitT = i => i * BEAT;                                // strikes on beats 0..5, then the big one on the drop
 const UF = 880, UT = 610;                                  // upper tunnel floor and roof (the quitter's level)
 const GEM2 = { x: 900, y: 800 }, QFACE0 = 520, QHITS = 4, QUIT = 4 * BEAT;
-const LEDGE = [[-400, UF], [350, UF], [330, UF + 22], [-400, UF + 22]];
+const LEDGE = [[-900, UF], [350, UF], [330, UF + 22], [-900, UF + 22]];
 const MOUNT = [[100, GROUND], [700, 300], [1010, 640], [1180, 520], [1900, GROUND]];
 const BACK = [[-700, GROUND], [-180, 560], [260, GROUND]];
 const BACK2 = [[1300, GROUND], [1650, 430], [2300, GROUND]];
@@ -138,9 +138,9 @@ function quitter(t) {
   const x0 = qFaceAt(QUIT) - reach;
   const slump = eo(seg(t, QUIT - .25, QUIT + .1));
   const F = figure(x0, lerp(armAngle(QUIT - .25), 168, slump), 0, UF);
-  const walk = seg(t, QUIT + .35, QUIT + 3.0);
+  const walk = seg(t, QUIT + .35, QUIT + 3.8);
   const pick = t > QUIT + .1 ? { x: x0 + 120, fall: eo(seg(t, QUIT + .1, QUIT + .35)) } : null;
-  if (walk > 0) { F.fx = x0 - 760 * walk; F.legs = walk * 3000 / 60; for (const k of ['sh', 'hip', 'head']) F[k] = [F[k][0] - 760 * walk, F[k][1]];
+  if (walk > 0) { F.fx = x0 - 1200 * walk; F.legs = walk * 4200 / 60; for (const k of ['sh', 'hip', 'head']) F[k] = [F[k][0] - 1200 * walk, F[k][1]];
     F.grip = [F.sh[0] - 6, F.sh[1] + 96]; F.elbow = [F.sh[0] - 4, F.sh[1] + 50]; }
   return { F, pick, dir: walk > 0 ? -1 : 1, x0 };
 }
@@ -157,7 +157,7 @@ function world(t, F, face) {
   for (let i = 0; i <= 8; i++) { const y = lerp(UT, UF, i / 8); g.lineTo(qf + (hash(i * 3 + Math.floor(qf)) - .5) * 26, y); }
   g.lineTo(300, UF); g.closePath(); g.fill();
   poly(LEDGE, '#171717');
-  g.strokeStyle = '#262626'; g.lineWidth = 2; g.beginPath(); g.moveTo(-400, UF); g.lineTo(qf, UF); g.stroke();
+  g.strokeStyle = '#262626'; g.lineWidth = 2; g.beginPath(); g.moveTo(-900, UF); g.lineTo(qf, UF); g.stroke();
   // cracks spreading from the drop strike
   if (broke(t)) {
     const a = eo(seg(t, DROP, DROP + .3));
