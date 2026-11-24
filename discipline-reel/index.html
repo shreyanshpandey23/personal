@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Discipline</title>
+<style>
+@font-face{font-family:'Jost';src:url('fonts/Jost.ttf') format('truetype');font-weight:100 900;}
+html,body{margin:0;background:#000;overflow:hidden}canvas{display:block}
+</style></head><body>
+<canvas id="c"></canvas>
+<script>
+const W = innerWidth, H = innerHeight, S = W / 1080;
+const cv = document.getElementById('c'); cv.width = W; cv.height = H;
+const g = cv.getContext('2d');
+const DUR = 14.5, BEAT = 0.58, DROP = 9 * BEAT;          // beat grid locked to the song segment (beat 0 = film 0)
+const clamp = (x, a, b) => Math.max(a, Math.min(b, x)), lerp = (a, b, k) => a + (b - a) * k;
+const seg = (t, a, b) => clamp((t - a) / (b - a), 0, 1);
+const eo = x => 1 - Math.pow(1 - x, 3), ei = x => x * x * x, eio = x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+const beatOf = t => Math.floor(t / BEAT), phase = t => (t / BEAT) - Math.floor(t / BEAT);
+
+// ---------- a push-up rep on each beat: drop fast onto the beat, push up through it ----------
+// returns depth 0 (arms straight) … 1 (chest at the floor)
+function repDepth(p) { return p < .22 ? eo(p / .22) : 1 - eio((p - .22) / .78); }
+
+// ---------- the figure (side view, feet left, head right); pose blends push-up → flat → standing ----------
+function pose(depth, flat = 0, stand = 0, lift = 0) {
+  const B = 240, ARM = 48;
+  const hy = (1 - depth) * 96 + 26 * depth;                 // shoulder height
+  let th = Math.asin(clamp(hy / B, 0, 1)); th = lerp(th, 0.02, flat);
+  const sh = [B * Math.cos(th), -B * Math.sin(th) - lift];
+  const head = [sh[0] + 30 * Math.cos(th), sh[1] - 30 * Math.sin(th) - 6 * (1 - flat)];
+  const hand = [226, -lift * (lift > 0 ? 1 : 0)];
+  // two-bone arm, elbow bends back toward the feet
+  const dx = hand[0] - sh[0], dy = hand[1] - sh[1], d = Math.min(Math.hypot(dx, dy), 2 * ARM - .01);
+  const a = Math.atan2(dy, dx), b = Math.acos(d / (2 * ARM));
+  let elbow = [sh[0] + ARM * Math.cos(a + b), sh[1] + ARM * Math.sin(a + b)];
+  if (flat > 0) elbow = [lerp(elbow[0], sh[0] - 50, flat), lerp(elbow[1], -4, flat)];
+  const P = { feet: [0, 0], toe: [0, 16], sh, head, elbow, hand: flat > 0 ? [lerp(hand[0], sh[0] - 4, flat), lerp(hand[1], -6, flat)] : hand };
+  if (stand > 0) {   // standing: feet on the floor, body upright at x = 150
+    const S2 = { feet: [150, 0], toe: [150, 0], sh: [150, -220], head: [150, -262], elbow: [170, -158], hand: [184, -96], feet2: [150, 0] };
+    for (const k of Object.keys(S2)) if (P[k]) P[k] = [lerp(P[k][0], S2[k][0], stand), lerp(P[k][1], S2[k][1], stand)];
+  }
+  return P;
+}
+function drawFigure(P, alpha = 1, legs = 0) {
+  g.save(); g.globalAlpha *= alpha; g.strokeStyle = '#FFF'; g.fillStyle = '#FFF'; g.lineCap = 'round'; g.lineJoin = 'round'; g.lineWidth = 15;
+  g.beginPath();
+  if (legs > 0) {   // standing legs split from the hips
+    const hip = [lerp(P.feet[0], P.sh[0], .45), lerp(P.feet[1], P.sh[1], .45)];
+    g.moveTo(...P.sh); g.lineTo(...hip); g.moveTo(...hip); g.lineTo(hip[0] - 26 * legs, 0); g.moveTo(...hip); g.lineTo(hip[0] + 26 * legs, 0);
+  } else { g.moveTo(...P.toe); g.lineTo(...P.feet); g.lineTo(...P.sh); }
+  g.moveTo(...P.sh); g.lineTo(...P.elbow); g.lineTo(...P.hand);
+  g.stroke();
+  g.beginPath(); g.arc(P.head[0], P.head[1], 26, 0, Math.PI * 2); g.fill();
+  g.restore();
+}
+// figure + soft blurred reflection under the floor line
+function figureAt(cx, floorY, sc, P, alpha = 1, legs = 0) {
+  g.save(); g.translate(cx - 120 * sc * S, floorY); g.scale(sc * S, sc * S); drawFigure(P, alpha, legs); g.restore();
+  g.save(); g.filter = `blur(${10 * sc * S}px)`; g.globalAlpha = .22 * alpha; g.translate(cx - 120 * sc * S, floorY + 70 * sc * S); g.scale(sc * S, -sc * S * .9); drawFigure(P, 1, legs); g.restore();
+}
+function label(s, y, alpha = 1, size = 30, track = 4) {
+  if (alpha <= 0) return;
+  g.save(); g.globalAlpha = alpha; g.fillStyle = '#FFF'; g.font = `500 ${size * S}px Jost`; g.textAlign = 'center'; g.letterSpacing = `${track * S}px`;
+  g.fillText(s, W / 2, y); g.restore();
+}
+
+let TEXT_LIST = [];
+function render(t) {
+  TEXT_LIST = [];
+  g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = 1; g.filter = 'none';
+  g.fillStyle = '#000'; g.fillRect(0, 0, W, H);
+  const b = beatOf(t), p = phase(t);
+  // a small punch on every beat after the drop
+  const punch = t >= DROP ? 1 + .035 * Math.exp(-p * 7) * (b % 2 === 0 ? 1.6 : 1) : 1;
+  g.save(); g.translate(W / 2, H / 2); g.scale(punch, punch); g.translate(-W / 2, -H / 2);
+
+  if (t < DROP) {
+    // ---- scene 1: motivation fades out, discipline keeps the beat ----
+    const fadeIn = eo(seg(t, 0, .5));
+    label('MOTIVATION:', 590 * S, fadeIn); label('DISCIPLINE:', 1100 * S, fadeIn);
+    TEXT_LIST.push({ id: 'm', text: 'MOTIVATION:', x0: 360 * S, y0: 560 * S, x1: 720 * S, y1: 600 * S }, { id: 'd', text: 'DISCIPLINE:', x0: 360 * S, y0: 1070 * S, x1: 720 * S, y1: 1110 * S });
+    // motivation: three good reps, a slow half rep, then gives up and lies flat
+    let dM, flat = 0;
+    if (b < 3) dM = repDepth(p);
+    else if (b < 5) { const q = seg(t, 3 * BEAT, 5 * BEAT); dM = q < .45 ? eo(q / .45) * .85 : .85 - .45 * eio((q - .45) / .55); }
+    else { dM = lerp(.4, 1, eo(seg(t, 5 * BEAT, 5.4 * BEAT))); flat = eio(seg(t, 5.3 * BEAT, 6.2 * BEAT)); }
+    figureAt(W / 2, 820 * S, 1, pose(dM, flat), fadeIn);
+    // discipline: a rep on every beat, through the quiet bar too
+    figureAt(W / 2, 1330 * S, 1, pose(repDepth(p)), fadeIn);
+  } else if (t < 17 * BEAT) {
+    // ---- scene 2 (the drop): discipline alone, bigger; clap push-ups from beat 13 ----
+    const k = 1.55;
+    label('DISCIPLINE:', 640 * S, 1);
+    TEXT_LIST.push({ id: 'd2', text: 'DISCIPLINE:', x0: 360 * S, y0: 610 * S, x1: 720 * S, y1: 650 * S });
+    let d = repDepth(p), lift = 0;
+    if (b >= 13) { lift = p > .22 && p < .7 ? Math.sin(Math.PI * (p - .22) / .48) * 46 : 0; }
+    figureAt(W / 2, 1120 * S, k, pose(d, 0, 0, lift));
+    // clap: two short white ticks above the hands at the top of the jump
+    if (lift > 30) { g.save(); g.globalAlpha = (lift - 30) / 16; g.strokeStyle = '#FFF'; g.lineWidth = 6 * S; g.lineCap = 'round';
+      const hx = W / 2 + (226 - 120) * k * S, hy = 1120 * S - (lift + 40) * k * S;
+      for (const a of [-.6, 0, .6]) { g.beginPath(); g.moveTo(hx + Math.sin(a) * 40 * S, hy - Math.cos(a) * 40 * S); g.lineTo(hx + Math.sin(a) * 66 * S, hy - Math.cos(a) * 66 * S); g.stroke(); }
+      g.restore(); }
+  } else {
+    // ---- scene 3: stand up, the line lands on the next beat and holds ----
+    const T0 = 17 * BEAT, st = eio(seg(t, T0, T0 + .45));
+    const P = pose(0, 0, st);
+    figureAt(W / 2, 1180 * S, 1.55, P, 1, st);
+    const a = seg(t, 18 * BEAT, 18 * BEAT + .08);
+    const pulse = 1 + .05 * Math.exp(-phase(t) * 8) * (t > 18 * BEAT ? 1 : 0);
+    g.save(); g.translate(W / 2, 620 * S); g.scale(pulse, pulse); g.translate(-W / 2, -620 * S);
+    label('DISCIPLINE WINS.', 640 * S, a, 58, 8); g.restore();
+    if (a > 0) TEXT_LIST.push({ id: 'end', text: 'DISCIPLINE WINS.', x0: 160 * S, y0: 590 * S, x1: 920 * S, y1: 660 * S });
+    // fade to black on the last half second
+  }
+  g.restore();
+  // the drop: a white flash cut
+  const fl = Math.max(0, 1 - (t - DROP) / .18) * (t >= DROP ? 1 : 0);
+  if (fl > 0) { g.fillStyle = `rgba(255,255,255,${fl * .85})`; g.fillRect(0, 0, W, H); }
+  const fo = seg(t, DUR - .45, DUR); if (fo > 0) { g.fillStyle = `rgba(0,0,0,${fo})`; g.fillRect(0, 0, W, H); }
+}
+window.DUR = DUR; window.render = render;
+window.EV = Array.from({ length: Math.ceil(DUR / BEAT) }, (_, i) => ({ t: i * BEAT, type: 'beat', i }));
+window.TEXTS = t => { render(t); return TEXT_LIST.slice(); };
+document.fonts.load('500 30px Jost').then(() => { render(0); window.READY = true; });
+</script></body></html>
