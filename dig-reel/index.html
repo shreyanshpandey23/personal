@@ -22,6 +22,9 @@ const GROUND = 1250, TOP = 930;                           // tunnel floor and ro
 const GEM = { x: 840, y: 1150 }, CAVE_R = 120;
 const FACE0 = 330, STEP = 60, HITS = 6;                    // tunnel face before the first strike; advance per strike
 const hitT = i => i * BEAT;                                // strikes on beats 0..5, then the big one on the drop
+const UF = 880, UT = 610;                                  // upper tunnel floor and roof (the quitter's level)
+const GEM2 = { x: 900, y: 800 }, QFACE0 = 520, QHITS = 4, QUIT = 4 * BEAT;
+const LEDGE = [[-400, UF], [350, UF], [330, UF + 22], [-400, UF + 22]];
 const MOUNT = [[100, GROUND], [700, 300], [1010, 640], [1180, 520], [1900, GROUND]];
 const BACK = [[-700, GROUND], [-180, 560], [260, GROUND]];
 const BACK2 = [[1300, GROUND], [1650, 430], [2300, GROUND]];
@@ -52,8 +55,8 @@ function armAngle(t) {
 
 // ---------- the figure ----------
 // fx = feet x; returns the pick tip in world coords too
-function figure(fx, phi, lift = 0) {
-  const sh = [fx + 8, GROUND - 222], hip = [fx, GROUND - 112];
+function figure(fx, phi, lift = 0, gy = GROUND) {
+  const sh = [fx + 8, gy - 222], hip = [fx, gy - 112];
   const R = 74, a = phi * D2R;
   const grip = [sh[0] + R * Math.sin(a), sh[1] - R * Math.cos(a)];
   const elbow = [lerp(sh[0], grip[0], .5) - 12 * Math.cos(a), lerp(sh[1], grip[1], .5) - 12 * Math.sin(a)];
@@ -61,12 +64,13 @@ function figure(fx, phi, lift = 0) {
   const perp = [Math.cos(ps), Math.sin(ps)];
   const tip = [end[0] + perp[0] * 46 + Math.sin(ps) * 16, end[1] + perp[1] * 46 - Math.cos(ps) * 16];
   const back = [end[0] - perp[0] * 40 + Math.sin(ps) * 12, end[1] - perp[1] * 40 - Math.cos(ps) * 12];
-  return { fx, sh, hip, grip, elbow, end, tip, back, head: [fx + 14, GROUND - 262], lift };
+  return { fx, gy, sh, hip, grip, elbow, end, tip, back, head: [fx + 14, gy - 262], lift, legs: 0 };
 }
 function drawFigure(F, withPick = true) {
   g.strokeStyle = '#FFF'; g.fillStyle = '#FFF'; g.lineCap = 'round'; g.lineJoin = 'round';
   g.lineWidth = 14; g.beginPath();
-  g.moveTo(F.fx - 30, GROUND); g.lineTo(...F.hip); g.lineTo(F.fx + 28, GROUND);
+  const sw = 30 * Math.sin(F.legs || 0);
+  g.moveTo(F.fx - 30 + sw, F.gy); g.lineTo(...F.hip); g.lineTo(F.fx + 28 - sw, F.gy);
   g.moveTo(...F.hip); g.lineTo(...F.sh);
   if (F.lift > 0) {    // both arms up, holding the gem overhead
     const up = [F.sh[0] + 4, F.sh[1] - lerp(0, 120, F.lift)];
@@ -103,6 +107,11 @@ function rays(x, y, a, t) {
 }
 
 // ---------- rubble from each strike ----------
+function qRubble(t, tip) {
+  for (let i = 0; i < QHITS; i++) { const u = t - hitT(i); if (u < 0 || u > .6) continue;
+    for (let k = 0; k < 8; k++) { const sd = 500 + i * 13 + k, x = tip[0] - (100 + 300 * hash(sd)) * u, y = Math.min(UF - 4, tip[1] - (200 + 400 * hash(sd + 7)) * u + 1800 * u * u), sz = 5 + 7 * hash(sd + 3);
+      g.fillStyle = `rgba(220,220,220,${1 - u / .6})`; g.fillRect(x - sz / 2, y - sz / 2, sz, sz); } }
+}
 function rubble(t, tip) {
   const hits = [];
   for (let i = 0; i < HITS; i++) hits.push([hitT(i), 10]);
@@ -121,6 +130,20 @@ function rubble(t, tip) {
 
 // ---------- scene ----------
 function poly(pts, fill) { g.beginPath(); pts.forEach((p, i) => i ? g.lineTo(...p) : g.moveTo(...p)); g.closePath(); g.fillStyle = fill; g.fill(); }
+function qFaceAt(t) { let f = QFACE0; for (let i = 0; i < QHITS; i++) f += STEP * eo(seg(t, hitT(i), hitT(i) + .12)); return f; }
+// the quitter: same beat for four strikes, then lets the pick drop and walks back out along the ledge
+function quitter(t) {
+  const qf = qFaceAt(t), reach = 236;
+  if (t < QUIT - .25) return { F: figure(qFaceAt(Math.max(0, t - .2)) - reach, armAngle(t), 0, UF), pick: null, dir: 1 };
+  const x0 = qFaceAt(QUIT) - reach;
+  const slump = eo(seg(t, QUIT - .25, QUIT + .1));
+  const F = figure(x0, lerp(armAngle(QUIT - .25), 168, slump), 0, UF);
+  const walk = seg(t, QUIT + .35, QUIT + 3.0);
+  const pick = t > QUIT + .1 ? { x: x0 + 120, fall: eo(seg(t, QUIT + .1, QUIT + .35)) } : null;
+  if (walk > 0) { F.fx = x0 - 760 * walk; F.legs = walk * 3000 / 60; for (const k of ['sh', 'hip', 'head']) F[k] = [F[k][0] - 760 * walk, F[k][1]];
+    F.grip = [F.sh[0] - 6, F.sh[1] + 96]; F.elbow = [F.sh[0] - 4, F.sh[1] + 50]; }
+  return { F, pick, dir: walk > 0 ? -1 : 1, x0 };
+}
 function world(t, F, face) {
   poly(BACK, '#0C0C0C'); poly(BACK2, '#0C0C0C');
   poly(MOUNT, '#171717');
@@ -129,6 +152,12 @@ function world(t, F, face) {
   g.fillStyle = '#000'; g.beginPath(); g.moveTo(0, TOP + 30); g.lineTo(face - 20, TOP);
   for (let i = 0; i <= 8; i++) { const y = lerp(TOP, GROUND, i / 8); g.lineTo(face + (hash(i + Math.floor(face)) - .5) * 26, y); }
   g.lineTo(0, GROUND); g.closePath(); g.fill();
+  const qf = qFaceAt(t);
+  g.fillStyle = '#000'; g.beginPath(); g.moveTo(300, UT + 40); g.lineTo(qf - 20, UT);
+  for (let i = 0; i <= 8; i++) { const y = lerp(UT, UF, i / 8); g.lineTo(qf + (hash(i * 3 + Math.floor(qf)) - .5) * 26, y); }
+  g.lineTo(300, UF); g.closePath(); g.fill();
+  poly(LEDGE, '#171717');
+  g.strokeStyle = '#262626'; g.lineWidth = 2; g.beginPath(); g.moveTo(-400, UF); g.lineTo(qf, UF); g.stroke();
   // cracks spreading from the drop strike
   if (broke(t)) {
     const a = eo(seg(t, DROP, DROP + .3));
@@ -189,12 +218,20 @@ function render(t) {
   g.save(); g.filter = `blur(${9 * C.k * S}px)`; g.globalAlpha = .2; g.translate(0, 2 * GROUND + 30); g.scale(1, -.9); drawFigure(F); g.restore();
   g.save(); drawFigure(F); g.restore();
   rubble(t, F.tip);
+  const Q = quitter(t);
+  g.save(); g.globalAlpha = .55; gem(GEM2.x, GEM2.y, 1, .22 + .05 * Math.sin(t * 6 + 1)); g.restore();
+  g.save(); if (Q.dir < 0) { g.translate(2 * Q.F.fx, 0); g.scale(-1, 1); } drawFigure(Q.F, !Q.pick); g.restore();
+  if (Q.pick) { g.save(); g.strokeStyle = '#FFF'; g.lineCap = 'round'; g.translate(Q.pick.x, UF - 8); g.rotate(lerp(-1.2, 0, Q.pick.fall));
+    g.lineWidth = 9; g.beginPath(); g.moveTo(-75, 0); g.lineTo(75, 0); g.stroke(); g.lineWidth = 11; g.beginPath(); g.moveTo(62, -40); g.quadraticCurveTo(75, 0, 62, 40); g.stroke(); g.restore(); }
+  if (t < QUIT) qRubble(t, Q.F.tip);
   g.restore();
 
   // text, in screen space
   const s1 = seg(t, .15, .5) * (1 - seg(t, DROP - .05, DROP));
   const gs = [(gemPos[0] - C.cx) * C.k * S + W / 2, (gemPos[1] - C.cy) * C.k * S + H / 2];
   label('SUCCESS:', gs[0], gs[1] - 120 * S, s1, 30, 4, 's1');
+  const g2 = [(GEM2.x - C.cx) * C.k * S + W / 2, (GEM2.y - C.cy) * C.k * S + H / 2];
+  label('SUCCESS:', g2[0], g2[1] - 70 * S, s1, 30, 4, 's2');
   const e = seg(t, 12 * BEAT, 12 * BEAT + .08);
   const pulse = 1 + .05 * Math.exp(-((t / BEAT) % 1) * 8) * (e > 0 ? 1 : 0);
   if (e > 0) { g.save(); g.translate(W / 2, 330 * S); g.scale(pulse, pulse); g.translate(-W / 2, -330 * S); label('KEEP DIGGING.', W / 2, 350 * S, e, 60, 9, 'end'); g.restore(); }

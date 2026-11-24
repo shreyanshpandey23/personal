@@ -12,3 +12,4 @@
   - `ffmpeg -ss 32.526 -t 10.44 -i <song> -af "afade=t=in:d=0.06,afade=t=out:st=9.9:d=0.54" -ar 48000 -ac 2 out/mix.wav`
   - `sh master.sh` (normalise to −14 LUFS, then mux)
 - **Sync check:** the drop kick is detected at 4.08 s (strike at 4.06 s). 13 of 18 kicks are within 40 ms of the beat grid; the rest are off-beat hits.
+- **The quitter (added):** an upper tunnel on a rock ledge. He strikes in sync on beats 0–3, slumps and drops the pick on beat 4, and walks out along the ledge (gone by about 5 s). His tunnel stops about 140 px short of his own diamond; both diamonds are labelled "SUCCESS:".
