@@ -1,0 +1,214 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Bowlista — Minimal brand board</title>
+<style>
+:root{--paper:#F7F6F3;--ink:#141414;--stone:#E7E4DE;--grey:#8E8A84;--sage:#C9D1B3;--clay:#D8C3A8;--line:#DEDAD3}
+*{box-sizing:border-box;margin:0;padding:0}
+body{width:1672px;height:941px;background:var(--paper);color:var(--ink);font-family:Inter,sans-serif;padding:28px 32px;overflow:hidden}
+.grid{display:grid;gap:0;height:100%;grid-template-rows:208px 176px 262px 1fr}
+.row{display:grid;border-top:1px solid var(--line)}
+.row:last-child{border-bottom:1px solid var(--line)}
+.cell{padding:16px 22px 14px;position:relative}
+.cell+.cell{border-left:1px solid var(--line)}
+h2{font:500 10.5px/1 'JetBrains Mono',monospace;letter-spacing:.14em;text-transform:uppercase;color:var(--grey);margin-bottom:14px}
+h2 b{color:var(--ink);font-weight:500;margin-right:10px}
+.mono{font-family:'JetBrains Mono',monospace}
+.wm{font-weight:500;letter-spacing:-.035em;line-height:1}
+/* logo */
+.logos{display:grid;grid-template-columns:1.25fr 1fr .52fr;gap:12px;height:146px}
+.lg{display:flex;align-items:center;justify-content:center;position:relative}
+.lg small{position:absolute;left:10px;top:8px;font:400 9px 'JetBrains Mono';letter-spacing:.08em;opacity:.55}
+/* palette */
+.sw{display:grid;grid-template-columns:repeat(6,1fr);gap:12px}
+.sw div i{display:block;height:104px;border:1px solid rgba(0,0,0,.06)}
+.sw p{font-size:12px;font-weight:500;margin-top:9px}
+.sw span{font:400 10.5px 'JetBrains Mono';color:var(--grey);display:block;margin-top:3px}
+/* type */
+.type{display:grid;grid-template-columns:1.1fr 1fr;gap:26px}
+.cap{font:400 9.5px 'JetBrains Mono';color:var(--grey);letter-spacing:.06em;margin-top:8px}
+.pat{display:grid;grid-template-columns:repeat(5,92px);gap:12px}
+.pat div{height:92px;background:#fff;border:1px solid var(--line)}
+.icons{display:flex;gap:22px;align-items:center;margin-top:6px}
+.pill{border:1px solid var(--ink);border-radius:99px;padding:7px 14px;font:500 11px 'JetBrains Mono';letter-spacing:.04em}
+.label{font:400 9px 'JetBrains Mono';fill:var(--grey);letter-spacing:.06em}
+.chip{display:inline-block;border:1px solid var(--ink);border-radius:99px;padding:7px 20px;font-size:14px;margin-right:8px}
+</style></head><body>
+<div class="grid">
+
+<!-- ROW 1 -->
+<div class="row" style="grid-template-columns:.47fr .53fr">
+  <div class="cell"><h2><b>01</b>Primary logo</h2>
+    <div class="logos">
+      <div class="lg" style="background:var(--ink);color:var(--paper)"><span class="wm" style="font-size:54px">bowlista.</span><small>ON INK</small></div>
+      <div style="display:grid;grid-template-rows:1fr 1fr;gap:12px">
+        <div class="lg" style="background:#fff;border:1px solid var(--line)"><span class="wm" style="font-size:34px">bowlista.</span><small>ON WHITE</small></div>
+        <div class="lg" style="background:var(--sage)"><span class="wm" style="font-size:34px">bowlista.</span><small>ON SAGE</small></div>
+      </div>
+      <div style="display:grid;grid-template-rows:1fr auto;gap:8px">
+        <div class="lg" style="background:var(--ink);color:var(--paper)"><span class="wm" style="font-size:52px">b.</span></div>
+        <div class="mono" style="font-size:9px;color:var(--grey);letter-spacing:.06em">MONOGRAM<br>MIN 24 PX</div>
+      </div>
+    </div>
+  </div>
+  <div class="cell"><h2><b>02</b>Colour palette</h2>
+    <div class="sw">
+      <div><i style="background:#F7F6F3"></i><p>Paper</p><span>#F7F6F3</span></div>
+      <div><i style="background:#FFFFFF"></i><p>White</p><span>#FFFFFF</span></div>
+      <div><i style="background:#141414"></i><p>Ink</p><span>#141414</span></div>
+      <div><i style="background:#E7E4DE"></i><p>Stone</p><span>#E7E4DE</span></div>
+      <div><i style="background:#C9D1B3"></i><p>Sage <span style="display:inline;font-size:9px">accent</span></p><span>#C9D1B3</span></div>
+      <div><i style="background:#D8C3A8"></i><p>Kraft <span style="display:inline;font-size:9px">accent</span></p><span>#D8C3A8</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ROW 2 -->
+<div class="row" style="grid-template-columns:.45fr .55fr">
+  <div class="cell"><h2><b>03</b>Typography</h2>
+    <div class="type">
+      <div>
+        <div style="font-size:38px;font-weight:500;letter-spacing:-.035em;line-height:1.02">Fresh.<br>Plant-powered.</div>
+        <div class="cap">INTER MEDIUM — HEADLINES, −3.5% TRACKING</div>
+      </div>
+      <div style="border-left:1px solid var(--line);padding-left:24px">
+        <div style="font-size:22px;font-weight:400;letter-spacing:-.01em">Aa Bb Cc 123</div>
+        <div style="font-size:11.5px;color:#444;margin-top:6px;line-height:1.5">Inter Regular — body copy and menus.<br>Short sentences. Say what is in the bowl.</div>
+        <div class="mono" style="font-size:11.5px;margin-top:10px">PROTEIN 24 G · 520 KCAL</div>
+        <div class="cap" style="margin-top:4px">JETBRAINS MONO — LABELS AND NUTRITION</div>
+      </div>
+    </div>
+  </div>
+  <div class="cell"><h2><b>04</b>Patterns and graphics</h2>
+    <div style="display:flex;gap:26px">
+      <div class="pat">
+        <div><svg width="92" height="92"><g stroke="#141414" stroke-width=".6" opacity=".5"><path d="M0 23H92M0 46H92M0 69H92M23 0V92M46 0V92M69 0V92"/></g></svg></div>
+        <div><svg width="92" height="92"><circle cx="8.0" cy="8.0" r="1.2" fill="#141414"/><circle cx="23.2" cy="8.0" r="1.2" fill="#141414"/><circle cx="38.4" cy="8.0" r="1.2" fill="#141414"/><circle cx="53.6" cy="8.0" r="1.2" fill="#141414"/><circle cx="68.8" cy="8.0" r="1.2" fill="#141414"/><circle cx="84.0" cy="8.0" r="1.2" fill="#141414"/><circle cx="8.0" cy="23.2" r="1.2" fill="#141414"/><circle cx="23.2" cy="23.2" r="1.2" fill="#141414"/><circle cx="38.4" cy="23.2" r="1.2" fill="#141414"/><circle cx="53.6" cy="23.2" r="1.2" fill="#141414"/><circle cx="68.8" cy="23.2" r="1.2" fill="#141414"/><circle cx="84.0" cy="23.2" r="1.2" fill="#141414"/><circle cx="8.0" cy="38.4" r="1.2" fill="#141414"/><circle cx="23.2" cy="38.4" r="1.2" fill="#141414"/><circle cx="38.4" cy="38.4" r="1.2" fill="#141414"/><circle cx="53.6" cy="38.4" r="1.2" fill="#141414"/><circle cx="68.8" cy="38.4" r="1.2" fill="#141414"/><circle cx="84.0" cy="38.4" r="1.2" fill="#141414"/><circle cx="8.0" cy="53.6" r="1.2" fill="#141414"/><circle cx="23.2" cy="53.6" r="1.2" fill="#141414"/><circle cx="38.4" cy="53.6" r="1.2" fill="#141414"/><circle cx="53.6" cy="53.6" r="1.2" fill="#141414"/><circle cx="68.8" cy="53.6" r="1.2" fill="#141414"/><circle cx="84.0" cy="53.6" r="1.2" fill="#141414"/><circle cx="8.0" cy="68.8" r="1.2" fill="#141414"/><circle cx="23.2" cy="68.8" r="1.2" fill="#141414"/><circle cx="38.4" cy="68.8" r="1.2" fill="#141414"/><circle cx="53.6" cy="68.8" r="1.2" fill="#141414"/><circle cx="68.8" cy="68.8" r="1.2" fill="#141414"/><circle cx="84.0" cy="68.8" r="1.2" fill="#141414"/><circle cx="8.0" cy="84.0" r="1.2" fill="#141414"/><circle cx="23.2" cy="84.0" r="1.2" fill="#141414"/><circle cx="38.4" cy="84.0" r="1.2" fill="#141414"/><circle cx="53.6" cy="84.0" r="1.2" fill="#141414"/><circle cx="68.8" cy="84.0" r="1.2" fill="#141414"/><circle cx="84.0" cy="84.0" r="1.2" fill="#141414"/></svg></div>
+        <div><svg width="92" height="92"><g stroke="#141414" stroke-width=".7" fill="none"><path d="M0 30H92M0 46H92M0 62H92"/></g></svg></div>
+        <div style="background:var(--sage)"><svg width="92" height="92"><circle cx="46" cy="46" r="24" fill="none" stroke="#141414" stroke-width="1"/></svg></div>
+        <div style="background:var(--ink)"><svg width="92" height="92"><path d="M22 44a24 24 0 0 0 48 0z" fill="none" stroke="#F7F6F3" stroke-width="1.2"/><path d="M18 44H74" stroke="#F7F6F3" stroke-width="1.2"/></svg></div>
+      </div>
+      <div style="border-left:1px solid var(--line);padding-left:24px">
+        <div class="icons">
+          <svg width="40" height="40" fill="none" stroke="#141414" stroke-width="1.3" stroke-linecap="round"><path d="M5 18h30a15 15 0 0 1-30 0z"/><path d="M13 16c1-5 5-7 8-6M21 15c2-4 6-5 8-3"/></svg>
+          <svg width="40" height="40" fill="none" stroke="#141414" stroke-width="1.3" stroke-linecap="round"><rect x="12" y="4" width="16" height="32" rx="8" transform="rotate(30 20 20)"/><path d="M11 20l14 8" /></svg>
+          <svg width="44" height="40" fill="none" stroke="#141414" stroke-width="1.3" stroke-linecap="round"><path d="M4 18a6 6 0 0 1 6-6h24a6 6 0 0 1 6 6z"/><path d="M4 22h36M6 26h32a0 0 0 0 1 0 0 4 4 0 0 1-4 4H10a4 4 0 0 1-4-4z"/></svg>
+          <svg width="32" height="40" fill="none" stroke="#141414" stroke-width="1.3" stroke-linecap="round"><path d="M6 10h20l-3 26H9zM5 10h22M18 10l4-8"/></svg>
+          <svg width="32" height="40" fill="none" stroke="#141414" stroke-width="1.3" stroke-linecap="round"><path d="M16 34C6 30 4 18 10 8c10 2 14 12 6 26zM16 34V18"/></svg>
+        </div>
+        <div style="margin-top:22px"><span class="pill">100% PURE VEG</span></div>
+        <div class="cap" style="margin-top:12px">1.3 PX LINE ICONS · ONE ACCENT PER LAYOUT</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ROW 3 -->
+<div class="row" style="grid-template-columns:.52fr .26fr .22fr">
+  <div class="cell"><h2><b>05</b>Packaging</h2>
+    <svg width="820" height="206" font-family="Inter">
+      <!-- bowl -->
+      <g transform="translate(20,40)">
+        <path d="M0 40 L14 140 Q80 156 146 140 L160 40 Z" fill="#fff" stroke="#CFCAC2"/>
+        <ellipse cx="80" cy="40" rx="80" ry="16" fill="#F2F0EC" stroke="#CFCAC2"/>
+        <text x="80" y="82" text-anchor="middle" font-size="19" font-weight="500" letter-spacing="-.6">bowlista.</text>
+        <line x1="40" y1="94" x2="120" y2="94" stroke="#141414" stroke-width=".6"/>
+        <text x="80" y="108" text-anchor="middle" class="label" style="fill:#141414;font-size:8px">PANEER TIKKA</text>
+        <text x="80" y="121" text-anchor="middle" class="label" style="font-size:7.5px">24 G PROTEIN</text>
+      </g>
+      <!-- wrap -->
+      <g transform="translate(215,70)">
+        <rect x="0" y="20" width="150" height="62" rx="31" fill="#E4E2DE" stroke="#CFCAC2"/>
+        <rect x="48" y="18" width="60" height="66" fill="#fff" stroke="#CFCAC2"/>
+        <text x="78" y="50" text-anchor="middle" font-size="12" font-weight="500" letter-spacing="-.4">bowlista.</text>
+        <text x="78" y="66" text-anchor="middle" class="label">WRAP 02</text>
+      </g>
+      <!-- sub box -->
+      <g transform="translate(395,70)">
+        <path d="M0 30 L30 10 H160 L130 30 Z" fill="#F2F0EC" stroke="#CFCAC2"/>
+        <path d="M130 30 L160 10 V64 L130 84 Z" fill="#E7E4DE" stroke="#CFCAC2"/>
+        <rect x="0" y="30" width="130" height="54" fill="#fff" stroke="#CFCAC2"/>
+        <text x="16" y="62" font-size="16" font-weight="500" letter-spacing="-.5">bowlista.</text>
+        <text x="16" y="76" class="label">SUB 03 · 30 CM</text>
+      </g>
+      <!-- cup -->
+      <g transform="translate(590,22)">
+        <path d="M0 8 H70 L62 150 H8 Z" fill="#fff" stroke="#CFCAC2"/>
+        <path d="M5 40 H65 L62 150 H8 Z" fill="#5A4636" opacity=".85"/>
+        <rect x="4" y="76" width="62" height="36" fill="#C9D1B3"/>
+        <text x="35" y="97" text-anchor="middle" font-size="12" font-weight="500" letter-spacing="-.4">bowlista.</text>
+        <text x="35" y="108" text-anchor="middle" class="label" style="font-size:7px;fill:#141414">COLD BREW</text>
+        <rect x="-3" y="0" width="76" height="9" rx="2" fill="#F2F0EC" stroke="#CFCAC2"/>
+      </g>
+      <!-- bag -->
+      <g transform="translate(690,20)">
+        <path d="M34 34 Q34 6 58 6 Q82 6 82 34" fill="none" stroke="#B8A387" stroke-width="3"/>
+        <rect x="0" y="30" width="116" height="140" fill="#D8C3A8"/>
+        <text x="58" y="104" text-anchor="middle" font-size="17" font-weight="500" letter-spacing="-.6">bowlista.</text>
+        <text x="58" y="120" text-anchor="middle" class="label" style="fill:#5d5244">100% PURE VEG</text>
+      </g>
+      <g class="label"><text x="20" y="200">01 — BOWL</text><text x="215" y="200">02 — WRAP SLEEVE</text><text x="395" y="200">03 — SUB BOX</text><text x="590" y="200">04 — CUP</text><text x="690" y="200">05 — BAG</text></g>
+    </svg>
+  </div>
+  <div class="cell"><h2><b>06</b>Uniform</h2>
+    <svg width="380" height="206">
+      <g transform="translate(4,60)">
+        <path d="M6 54 Q6 8 52 8 Q98 8 98 54 Z" fill="#141414"/><path d="M60 54 H124 Q118 64 98 64 H60 Z" fill="#141414"/>
+        <text x="52" y="40" text-anchor="middle" fill="#F7F6F3" font-family="Inter" font-size="12" font-weight="500" letter-spacing="-.4">b.</text>
+      </g>
+      <g transform="translate(138,16)">
+        <path d="M28 2 Q47 -6 66 2" fill="none" stroke="#B9B4AC" stroke-width="2"/><path d="M28 2 H66 V36 Q72 50 94 54 V170 H0 V54 Q22 50 28 36 Z" fill="#E7E4DE" stroke="#CFCAC2"/>
+        <text x="47" y="74" text-anchor="middle" font-family="Inter" font-size="13" font-weight="500" letter-spacing="-.4">bowlista.</text>
+      </g>
+      <g transform="translate(248,36)">
+        <path d="M34 0 Q58 12 82 0 L116 18 L104 48 L92 42 V150 H24 V42 L12 48 L0 18 Z" fill="#fff" stroke="#CFCAC2"/>
+        <text x="74" y="54" text-anchor="middle" font-family="Inter" font-size="9" font-weight="500" letter-spacing="-.3">bowlista.</text>
+      </g>
+      <g class="label"><text x="4" y="200">CAP</text><text x="138" y="200">APRON</text><text x="248" y="200">TEE</text></g>
+    </svg>
+  </div>
+  <div class="cell" style="padding-right:0"><h2><b>07</b>Storefront</h2>
+    <svg width="300" height="206" viewBox="0 0 330 206" font-family="Inter">
+      <rect x="0" y="0" width="330" height="190" fill="#fff" stroke="#DEDAD3"/>
+      <rect x="0" y="0" width="330" height="40" fill="#141414"/>
+      <text x="20" y="27" fill="#F7F6F3" font-size="19" font-weight="500" letter-spacing="-.6">bowlista.</text>
+      <text x="310" y="25" text-anchor="end" font-family="JetBrains Mono" font-size="8" fill="#B5B1AB" letter-spacing=".8">BOWLS · WRAPS · SUBS · COLD BREW</text>
+      <g fill="none" stroke="#141414" stroke-width=".8"><rect x="40" y="58" width="70" height="34"/><rect x="130" y="58" width="70" height="34"/><rect x="220" y="58" width="70" height="34"/></g>
+      <g font-family="JetBrains Mono" font-size="6.5" fill="#8E8A84"><text x="46" y="70">BOWLS</text><text x="136" y="70">WRAPS</text><text x="226" y="70">BREWS</text></g>
+      <rect x="40" y="120" width="250" height="56" fill="#E7E4DE"/>
+      <text x="165" y="152" text-anchor="middle" font-size="13" font-weight="500" letter-spacing="-.4">bowlista.</text>
+      <g fill="none" stroke="#141414" stroke-width="1"><path d="M14 176 V130 M14 140 q-10 -8 -6 -20 q8 4 6 20 M14 148 q10 -8 6 -20 q-8 4 -6 20"/><path d="M8 176 h12 l-2 -14 h-8z"/></g>
+    </svg>
+  </div>
+</div>
+
+<!-- ROW 4 -->
+<div class="row" style="grid-template-columns:.66fr .34fr">
+  <div class="cell"><h2><b>08</b>Digital and social</h2>
+    <div style="display:flex;gap:14px;align-items:center">
+      <div style="width:118px;height:118px;border-radius:50%;background:var(--ink);color:var(--paper);display:flex;align-items:center;justify-content:center"><span class="wm" style="font-size:44px">b.</span></div>
+      <div style="width:1px;height:118px;background:var(--line);margin:0 8px"></div>
+      <div style="width:150px;height:150px;background:#fff;border:1px solid var(--line);padding:16px;display:flex;flex-direction:column;justify-content:space-between">
+        <div style="font-size:20px;font-weight:500;letter-spacing:-.03em;line-height:1.05">bowls.<br>burritos.<br>subs.<br>brews.</div>
+        <div class="mono" style="font-size:8px;color:var(--grey)">MENU — 04 ITEMS</div></div>
+      <div style="width:150px;height:150px;background:var(--stone);position:relative">
+        <svg width="150" height="150" fill="none" stroke="#141414" stroke-width="1.2" stroke-linecap="round"><path d="M30 72h90a45 45 0 0 1-90 0z"/><circle cx="56" cy="62" r="8"/><circle cx="76" cy="58" r="7"/><circle cx="95" cy="63" r="8"/><path d="M64 70c4-6 10-6 14 0"/></svg>
+        <div class="mono" style="position:absolute;left:12px;bottom:10px;font-size:8px">PROTEIN 24 G · 520 KCAL</div></div>
+      <div style="width:150px;height:150px;background:var(--ink);color:var(--paper);padding:16px;display:flex;flex-direction:column;justify-content:space-between">
+        <div style="font-size:21px;font-weight:500;letter-spacing:-.03em;line-height:1.05">fresh.<br>plant-<br>powered.</div>
+        <div class="mono" style="font-size:8px;opacity:.6">100% PURE VEG</div></div>
+      <div style="width:1px;height:118px;background:var(--line);margin:0 8px"></div>
+      <div>
+        <div class="mono" style="font-size:9px;color:var(--grey);letter-spacing:.1em;margin-bottom:10px">ORDER ON</div>
+        <div style="display:flex;gap:8px"><div style="border:1px solid var(--ink);padding:14px 22px;font-size:15px;font-weight:500">Swiggy</div><div style="border:1px solid var(--ink);padding:14px 22px;font-size:15px;font-weight:500">Zomato</div></div>
+        <div class="cap" style="margin-top:10px">PARTNER NAMES SET IN BRAND TYPE,<br>NOT PARTNER COLOURS</div>
+      </div>
+    </div>
+  </div>
+  <div class="cell"><h2><b>09</b>Brand voice</h2>
+    <div style="font-size:42px;font-weight:400;letter-spacing:-.04em;line-height:1.05">Fresh.<br>Plant-powered.</div>
+    <div style="margin-top:16px"><span class="chip">Clear</span><span class="chip">Honest</span><span class="chip" style="background:var(--sage);border-color:var(--sage)">Fresh</span></div>
+    <div class="cap" style="margin-top:12px">SAY WHAT IS IN THE BOWL. NOTHING MORE.</div>
+  </div>
+</div>
+
+</div>
+</body></html>
