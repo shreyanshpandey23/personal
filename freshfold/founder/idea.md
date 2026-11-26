@@ -9,3 +9,5 @@
 ## Update (founder, after the board)
 - Pickup and drop added.
 - Monthly subscription added. Plan size and price not set yet (open question).
+- Pickups and drops run in clusters (batched routes, not one-off trips).
+- Shop to open in a very busy college area with many PGs and housing societies. Exact area not named yet.
