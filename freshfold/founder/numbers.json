@@ -1,0 +1,38 @@
+{
+  "business": "FreshFold Laundry (college-area shop, cluster pickup and drop, monthly plans)",
+  "unit": "kg",
+  "price": 54,
+  "variable": [
+    {"label": "Detergent and softener", "cost": 3},
+    {"label": "Electricity: wash and tumble-dry", "cost": 10},
+    {"label": "Water", "cost": 1},
+    {"label": "Ironing electricity (half the kg ironed)", "cost": 1},
+    {"label": "Bags and tags", "cost": 2},
+    {"label": "Fuel for cluster pickup and drop routes", "cost": 2},
+    {"label": "Damage and loss reserve", "cost": 1}
+  ],
+  "fixed_monthly": [
+    {"label": "Shop rent", "cost": 20000},
+    {"label": "2 wash and iron staff", "cost": 24000},
+    {"label": "1 pickup and drop rider", "cost": 12000},
+    {"label": "Utilities fixed charges", "cost": 3000},
+    {"label": "Phone, WhatsApp, billing app", "cost": 1500},
+    {"label": "Marketing: flyers, PG-owner referrals", "cost": 5000},
+    {"label": "Machine maintenance", "cost": 2000}
+  ],
+  "startup": [
+    {"label": "2 front-load washers (10 kg)", "cost": 120000},
+    {"label": "1 tumble dryer", "cost": 70000},
+    {"label": "Steam irons and ironing tables", "cost": 20000},
+    {"label": "Rent deposit (3 months)", "cost": 60000},
+    {"label": "Fit-out: plumbing, wiring, racks, counter, signage", "cost": 80000},
+    {"label": "Weighing scale and billing setup", "cost": 10000},
+    {"label": "Used scooter for pickups", "cost": 60000},
+    {"label": "Launch marketing", "cost": 20000},
+    {"label": "Opening stock: detergent, bags, tags", "cost": 10000}
+  ],
+  "days_per_month": 30,
+  "capacity_per_day": 100,
+  "plan_per_day": 80,
+  "ramp_per_day": [10, 18, 26, 34, 42, 30, 30, 50, 58, 66, 72, 78]
+}
